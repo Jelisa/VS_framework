@@ -16,6 +16,47 @@ library(hydroGOF)
 # ######################################################################################
 library(optparse)
 
+.thisfile_rscript <- function() {
+  # Get the file path of this script.
+  #
+  # This functions must be called only inside this script file, and assumes
+  # that, in case of a command-line script, it is the top-level script.
+  #
+  # Returns:
+  #   If this script was called as a command-line script, it returns its file path.
+  #   Otherwise, it returns NULL.
+  #
+  # This code was copied from http://stackoverflow.com/a/36075028
+  cmdArgs <- commandArgs(trailingOnly = FALSE)
+  cmdArgsTrailing <- commandArgs(trailingOnly = TRUE)
+  cmdArgs <- cmdArgs[seq.int(from=1, length.out=length(cmdArgs) - length(cmdArgsTrailing))]
+  res <- gsub("^(?:--file=(.*)|.*)$", "\\1", cmdArgs)
+
+  # If multiple --file arguments are given, R uses the last one
+  res <- tail(res[res != ""], 1)
+  if (length(res) > 0)
+    return (res)
+
+  NULL
+}
+
+.dummyGetThisDirname <- function() {
+  # Get the path of the directory of this script.
+  #
+  # This functions must be called only inside this script file, and assumes
+  # that, in case of a command-line script, it is the top-level script.
+  #
+  # Returns:
+  #   The path of the directory of this script.
+  thisDir <- getSrcDirectory(.dummyGetThisDirname)
+
+  if (length(thisDir) == 0) {
+    return (dirname(.thisfile_rscript()))
+  } else {
+    return (thisDir)
+  }
+}
+
 main <- function(opt)
 {
   # SFs and descriptors training datasets are mandatory to be passed!
@@ -144,7 +185,7 @@ main <- function(opt)
   ########################################################################################
   
   # Load Functions for models
-  source('models.R')
+  source(file.path(.dummyGetThisDirname(), 'models.R'))
   print(paste("Learning Models for descriptors and SFs..."))
   
   # Learning Process for Descriptors
