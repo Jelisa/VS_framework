@@ -268,7 +268,7 @@ getParser <- function() {
 # then, get a parser, parse the arguments, and call main
 # You must first have sourced this file, so that getParser is in your environment
 # > opt_parser <- getParser()
-# > opt <- parse_args(opt_parser, args=c("--train", "mytrain.csv", "--val", "myval.csv"))
+# > opt <- parse_args(opt_parser, args=unlist(strsplit("--train mytrain.csv --val myval.csv", " ")))
 # > main(opt)
 #
 # When running from the command line, the option will become, by default, TRUE,
