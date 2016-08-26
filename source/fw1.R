@@ -91,7 +91,6 @@ main <- function(opt)
           on the training dataset")
     xtrain_fool <- xtrain
     ytrain_fool <- ytrain
-    set.seed(1989)
     partition <- createDataPartition(ytrain[,1], times = 1, groups = 20, p = 0.7, list = TRUE)
     idx <- partition$Resample
     xtrain <- xtrain_fool[idx,]
@@ -279,5 +278,6 @@ if (getOption('run.commandline', default=TRUE)) {
   opt_parser <- getParser();
   opt = parse_args(opt_parser);
   
+  set.seed(1234)
   main(opt)  
 }
