@@ -8,12 +8,8 @@
 #           -d set1_all_descriptors.csv -e set2_all_descriptors.csv 
 #
 # ######################################################################################
+library(caret)
 library(hydroGOF)
-########################################################################################
-# ARGUMENTS INPUT  PROCESSING
-# This section performs input processing for the arguments that have to be passed and
-# should NOT be modified
-# ######################################################################################
 library(optparse)
 
 .thisfile_rscript <- function() {
@@ -57,6 +53,9 @@ library(optparse)
   }
 }
 
+# Load Functions for models
+source(file.path(.dummyGetThisDirname(), 'models.R'))
+
 main <- function(opt)
 {
   # SFs and descriptors training datasets are mandatory to be passed!
@@ -64,7 +63,6 @@ main <- function(opt)
     print_help(opt_parser)
     stop("At least the SFs and Descriptors training datasets must be supplied", call. = FALSE)
   }
-  
   
   ########################################################################################
   # READING DATASETS 
@@ -92,7 +90,6 @@ main <- function(opt)
   if (is.null(opt$sfs_val) | is.null(opt$des_val)){
     print("No validation datasets were provided, stratified sampling will be performed
           on the SFs and Descriptors training datasets")
-    library(caret)
     xsfs_fool <- xsfs
     ysfs_fool <- ysfs
     xdes_fool <- xdes
@@ -152,7 +149,6 @@ main <- function(opt)
   # Standardization (Z-score) of all the predictors is performed, centering all the 
   # variables to zero with standard deviation on 1.
   ########################################################################################
-  library(caret)
   # SFs
   xsfs.z <- scale(xsfs)
   xsfs.z <- as.data.frame(xsfs.z)
@@ -184,8 +180,6 @@ main <- function(opt)
   # demanded for SFs as well
   ########################################################################################
   
-  # Load Functions for models
-  source(file.path(.dummyGetThisDirname(), 'models.R'))
   print(paste("Learning Models for descriptors and SFs..."))
   
   # Learning Process for Descriptors
@@ -408,7 +402,6 @@ main <- function(opt)
   # The performance results on the validation set are always provided in terms of
   # Pearson Correlation (Rp) and Root Mean Squared Error (RMSE)
   ########################################################################################
-  library(hydroGOF)
   print("Evaluation SFs + descriptors")
   print("Pearson Correlation:")
   print(cor(best_val_all, ymodels_val[,1]))
@@ -462,6 +455,12 @@ main <- function(opt)
   plot(ridge_stack_model$ridge_cv, main = "Ridge shrinkage of coefficients")
   dev.off()
 }
+
+########################################################################################
+# ARGUMENTS INPUT  PROCESSING
+# This section performs input processing for the arguments that have to be passed and
+# should NOT be modified
+# ######################################################################################
 
 getParser <- function() {
   option_list = list(

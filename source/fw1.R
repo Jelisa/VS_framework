@@ -14,11 +14,7 @@
 #     EM-DMKM  2014-2016
 #     BSC-CNS  2016
 ###############################################################################################
-########################################################################################
-# ARGUMENTS INPUT  PROCESSING
-# This section performs input processing for the arguments that have to be passed and
-# should NOT be modified
-# ######################################################################################
+library(caret)
 library(optparse)
 
 .thisfile_rscript <- function() {
@@ -62,6 +58,9 @@ library(optparse)
   }
 }
 
+# Load Functions for models
+source(file.path(.dummyGetThisDirname(), 'models.R'))
+
 main <- function(opt)
 {
   # SFs or descriptors training datasets are mandatory to be passed!
@@ -90,7 +89,6 @@ main <- function(opt)
   if (is.null(opt$val)){
     print("No validation dataset was provided, stratified sampling will be performed
           on the training dataset")
-    library(caret)
     xtrain_fool <- xtrain
     ytrain_fool <- ytrain
     set.seed(1989)
@@ -126,7 +124,6 @@ main <- function(opt)
   # Standardization (Z-score) of all the predictors is performed, centering all the 
   # variables to zero with standard deviation of 1.
   ########################################################################################
-  library(caret)
   # Training
   xtrain.z <- scale(xtrain)
   xtrain.z <- as.data.frame(xtrain.z)
@@ -146,8 +143,6 @@ main <- function(opt)
   # demanded for SFs as well
   ########################################################################################
   
-  # Load Functions for models
-  source(file.path(.dummyGetThisDirname(), 'models.R'))
   print(paste("Learning Models..."))
   # LASSO
   lasso_model <- lasso(x = xtrain.z, y = ytrain)
@@ -249,6 +244,12 @@ main <- function(opt)
   plot(krls_model$krls_model)
   dev.off()  
 }
+
+########################################################################################
+# ARGUMENTS INPUT  PROCESSING
+# This section performs input processing for the arguments that have to be passed and
+# should NOT be modified
+# ######################################################################################
 
 getParser <- function() {
   option_list = list(
