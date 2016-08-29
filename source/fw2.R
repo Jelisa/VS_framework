@@ -112,7 +112,8 @@ main <- function(opt)
     xdes_val <- as.data.frame(xdes_val)
     ydes_val <- ydes_fool[-idx,]
     ydes_val <- as.data.frame(ydes_val)
-  } else{
+  }
+  else{
     sfs_val <- read.csv(opt$sfs_val, header = TRUE)
     des_val <- read.csv(opt$des_val, header = TRUE)
     complex_val <- sfs_val[1]
@@ -124,23 +125,52 @@ main <- function(opt)
   
   if(is.null(opt$sfs_new) | is.null(opt$des_new)){
     print("NO new data is provided")
-  }else{
-    # Scoring Functions 
-    sfs_new <- read.csv(opt$sfs_new, header = TRUE)
-    nsfs_new <- length(sfs_new)
-    xsfs_new <- sfs_new[, 2:nsfs_new]
-    xsfs_new.z <- scale(xsfs_new)
-    xsfs_new.z <- as.data.frame(xsfs_new.z)
-    
-    # Descriptors
-    des_new <- read.csv(opt$des_new, header = TRUE)
-    ndes_new <- length(des_new)
-    xdes_new <- des_new[, 2:ndes_new]
-    xdes_new.z <- scale(xdes_new)
-    xdes_new.z <- as.data.frame(xdes_new.z)
-    
-    # ALL
-    xall_new.z <- cbind(xsfs_new.z, xdes_new.z)
+  }
+  else{
+    # Read the new data, if the option -g or --new_data is used the program will
+    # use the last column in the new_data file as the experimental values for this
+    # and compute the statistics.
+    if (is.null(opt$new_data)){
+      # Scoring Functions 
+      sfs_new <- read.csv(opt$sfs_new, header = TRUE)
+      nsfs_new <- length(sfs_new)
+      xsfs_new <- sfs_new[, 2:nsfs_new]
+      xsfs_new.z <- scale(xsfs_new)
+      xsfs_new.z <- as.data.frame(xsfs_new.z)
+      
+      # Descriptors
+      des_new <- read.csv(opt$des_new, header = TRUE)
+      ndes_new <- length(des_new)
+      xdes_new <- des_new[, 2:ndes_new]
+      xdes_new.z <- scale(xdes_new)
+      xdes_new.z <- as.data.frame(xdes_new.z)
+      
+      # ALL
+      xall_new.z <- cbind(xsfs_new.z, xdes_new.z)    
+    }
+    else{
+      # Scoring Functions 
+      sfs_new <- read.csv(opt$sfs_new, header = TRUE)
+      nsfs_new_all <- length(sfs_new)
+      nsfs_new <- nsfs_new_all - 1
+      xsfs_new <- sfs_new[, 2:nsfs_new]
+      xsfs_new.z <- scale(xsfs_new)
+      xsfs_new.z <- as.data.frame(xsfs_new.z)
+      ysfs_new <- sfs_new[nsfs_new_all]
+      colnames(ysfs_new)[1] <- "Experimental"
+      # Descriptors
+      des_new <- read.csv(opt$des_new, header = TRUE)
+      ndes_new_all <- length(des_new)
+      ndes_new <- ndes_new_all - 1
+      xdes_new <- des_new[, 2:ndes_new]
+      xdes_new.z <- scale(xdes_new)
+      xdes_new.z <- as.data.frame(xdes_new.z)
+      ydes_new <- des_new[ndes_new_all]
+      ydes_new <- as.data.frame(ydes_new)
+      colnames(ydes_new)[1] <- "Experimental"
+      # ALL
+      xall_new.z <- cbind(xsfs_new.z, xdes_new.z)
+    }
   }
   
   ########################################################################################
@@ -406,19 +436,48 @@ main <- function(opt)
   print(cor(best_val_all, ymodels_val[,1]))
   print("RMSE:")
   print(rmse(as.numeric(best_val_all), ymodels_val[,1]))
-  
+
   print("Evaluation SFs")
   print("Pearson Correlation:")
   print(cor(best_val_sfs, ymodels_val[,1]))
   print("RMSE:")
   print(rmse(as.numeric(best_val_sfs), ymodels_val[,1]))
   
+  print("Evaluation SFs + descriptors")
+  print("Pearson Correlation:")
+  print(cor(best_val_all, ymodels_val[,1]))
+  print("RMSE:")
+  print(rmse(as.numeric(best_val_all), ymodels_val[,1]))
   
   print("Evaluation Ridge")
   print("Pearson Correlation:")
   print(cor(stack_val_res[,1], ymodels_val[,1]))
   print("RMSE:")
   print(rmse(stack_val_res[,1], ymodels_val[,1]))
+  
+  if (!is.null(opt$new_data)){
+    print("Statistics for the predicted values:")
+    
+    print("Evaluation SFs")
+    print("Pearson Correlation:")
+    print(cor(newdata_results[,1], ysfs_new[,1]))
+    print("RMSE:")
+    print(rmse(newdata_results[,1], ysfs_new[,1]))
+    
+    print("Evaluation SFs + descriptors")
+    print("Pearson Correlation:")
+    print(cor(newdata_results[,2], ysfs_new[,1]))
+    print("RMSE:")
+    print(rmse(as.numeric(newdata_results[,2]),ysfs_new[,1]))
+    
+    print("Evaluation Ridge")
+    print("Pearson Correlation:")
+    print(cor(newdata_results[,3], ysfs_new[,1]))
+    print("RMSE:")
+    print(rmse(newdata_results[,3], ysfs_new[,1]))
+    
+  }
+  
   
   ########################################################################################
   # Reports with Plots in PDF 
@@ -474,7 +533,9 @@ getParser <- function() {
     make_option(c("-e", "--des_val"), type = "character", default = NULL, 
                 help = "Descriptors Validation dataset OPTIONAL", metavar = "csv file"),
     make_option(c("-f", "--des_new"), type = "character", default = NULL, 
-                help = "Descriptors New Data dataset OPTIONAL", metavar = "csv file")
+                help = "Descriptors New Data dataset OPTIONAL", metavar = "csv file"),
+    make_option(c("-g","--new_data"), action = "store_true", default = NULL,
+                help = "A flag that allows for experimental energies in the new_data files. Should be only used with new_data values")
   );
   
   OptionParser(option_list = option_list);
