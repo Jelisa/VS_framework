@@ -8,13 +8,53 @@
 #           -d set1_all_descriptors.csv -e set2_all_descriptors.csv 
 #
 # ######################################################################################
+library(caret)
 library(hydroGOF)
-########################################################################################
-# ARGUMENTS INPUT  PROCESSING
-# This section performs input processing for the arguments that have to be passed and
-# should NOT be modified
-# ######################################################################################
 library(optparse)
+
+.thisfile_rscript <- function() {
+  # Get the file path of this script.
+  #
+  # This functions must be called only inside this script file, and assumes
+  # that, in case of a command-line script, it is the top-level script.
+  #
+  # Returns:
+  #   If this script was called as a command-line script, it returns its file path.
+  #   Otherwise, it returns NULL.
+  #
+  # This code was copied from http://stackoverflow.com/a/36075028
+  cmdArgs <- commandArgs(trailingOnly = FALSE)
+  cmdArgsTrailing <- commandArgs(trailingOnly = TRUE)
+  cmdArgs <- cmdArgs[seq.int(from=1, length.out=length(cmdArgs) - length(cmdArgsTrailing))]
+  res <- gsub("^(?:--file=(.*)|.*)$", "\\1", cmdArgs)
+
+  # If multiple --file arguments are given, R uses the last one
+  res <- tail(res[res != ""], 1)
+  if (length(res) > 0)
+    return (res)
+
+  NULL
+}
+
+.dummyGetThisDirname <- function() {
+  # Get the path of the directory of this script.
+  #
+  # This functions must be called only inside this script file, and assumes
+  # that, in case of a command-line script, it is the top-level script.
+  #
+  # Returns:
+  #   The path of the directory of this script.
+  thisDir <- getSrcDirectory(.dummyGetThisDirname)
+
+  if (length(thisDir) == 0) {
+    return (dirname(.thisfile_rscript()))
+  } else {
+    return (thisDir)
+  }
+}
+
+# Load Functions for models
+source(file.path(.dummyGetThisDirname(), 'models.R'))
 
 main <- function(opt)
 {
@@ -23,7 +63,6 @@ main <- function(opt)
     print_help(opt_parser)
     stop("At least the SFs and Descriptors training datasets must be supplied", call. = FALSE)
   }
-  
   
   ########################################################################################
   # READING DATASETS 
@@ -51,12 +90,10 @@ main <- function(opt)
   if (is.null(opt$sfs_val) | is.null(opt$des_val)){
     print("No validation datasets were provided, stratified sampling will be performed
           on the SFs and Descriptors training datasets")
-    library(caret)
     xsfs_fool <- xsfs
     ysfs_fool <- ysfs
     xdes_fool <- xdes
     ydes_fool <- ydes
-    set.seed(1989)
     partition <- createDataPartition(ysfs[,1], times = 1, groups = 20, p = 0.7, list = TRUE)
     idx <- partition$Resample
     xsfs <- xsfs_fool[idx,]
@@ -111,7 +148,6 @@ main <- function(opt)
   # Standardization (Z-score) of all the predictors is performed, centering all the 
   # variables to zero with standard deviation on 1.
   ########################################################################################
-  library(caret)
   # SFs
   xsfs.z <- scale(xsfs)
   xsfs.z <- as.data.frame(xsfs.z)
@@ -143,8 +179,6 @@ main <- function(opt)
   # demanded for SFs as well
   ########################################################################################
   
-  # Load Functions for models
-  source('models.R')
   print(paste("Learning Models for descriptors and SFs..."))
   
   # Learning Process for Descriptors
@@ -367,7 +401,6 @@ main <- function(opt)
   # The performance results on the validation set are always provided in terms of
   # Pearson Correlation (Rp) and Root Mean Squared Error (RMSE)
   ########################################################################################
-  library(hydroGOF)
   print("Evaluation SFs + descriptors")
   print("Pearson Correlation:")
   print(cor(best_val_all, ymodels_val[,1]))
@@ -422,6 +455,12 @@ main <- function(opt)
   dev.off()
 }
 
+########################################################################################
+# ARGUMENTS INPUT  PROCESSING
+# This section performs input processing for the arguments that have to be passed and
+# should NOT be modified
+# ######################################################################################
+
 getParser <- function() {
   option_list = list(
     make_option(c("-a", "--sfs"), type = "character", default = NULL,
@@ -447,7 +486,7 @@ getParser <- function() {
 # then, get a parser, parse the arguments, and call main
 # You must first have sourced this file, so that getParser is in your environment
 # > opt_parser <- getParser()
-# > opt <- parse_args(opt_parser, args=c("--sfs", "mysfs.csv", "--des", "mydes.csv"))
+# > opt <- parse_args(opt_parser, args=unlist(strsplit("--sfs mysfs.csv --des mydes.csv", " ")))
 # > main(opt)
 #
 # When running from the command line, the option will become, by default, TRUE,
@@ -457,5 +496,6 @@ if (getOption('run.commandline', default=TRUE)) {
   opt_parser <- getParser();
   opt = parse_args(opt_parser);
   
+  set.seed(1234)
   main(opt)  
 }

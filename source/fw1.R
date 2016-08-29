@@ -14,12 +14,52 @@
 #     EM-DMKM  2014-2016
 #     BSC-CNS  2016
 ###############################################################################################
-########################################################################################
-# ARGUMENTS INPUT  PROCESSING
-# This section performs input processing for the arguments that have to be passed and
-# should NOT be modified
-# ######################################################################################
+library(caret)
 library(optparse)
+
+.thisfile_rscript <- function() {
+  # Get the file path of this script.
+  #
+  # This functions must be called only inside this script file, and assumes
+  # that, in case of a command-line script, it is the top-level script.
+  #
+  # Returns:
+  #   If this script was called as a command-line script, it returns its file path.
+  #   Otherwise, it returns NULL.
+  #
+  # This code was copied from http://stackoverflow.com/a/36075028
+  cmdArgs <- commandArgs(trailingOnly = FALSE)
+  cmdArgsTrailing <- commandArgs(trailingOnly = TRUE)
+  cmdArgs <- cmdArgs[seq.int(from=1, length.out=length(cmdArgs) - length(cmdArgsTrailing))]
+  res <- gsub("^(?:--file=(.*)|.*)$", "\\1", cmdArgs)
+
+  # If multiple --file arguments are given, R uses the last one
+  res <- tail(res[res != ""], 1)
+  if (length(res) > 0)
+    return (res)
+
+  NULL
+}
+
+.dummyGetThisDirname <- function() {
+  # Get the path of the directory of this script.
+  #
+  # This functions must be called only inside this script file, and assumes
+  # that, in case of a command-line script, it is the top-level script.
+  #
+  # Returns:
+  #   The path of the directory of this script.
+  thisDir <- getSrcDirectory(.dummyGetThisDirname)
+
+  if (length(thisDir) == 0) {
+    return (dirname(.thisfile_rscript()))
+  } else {
+    return (thisDir)
+  }
+}
+
+# Load Functions for models
+source(file.path(.dummyGetThisDirname(), 'models.R'))
 
 main <- function(opt)
 {
@@ -49,10 +89,8 @@ main <- function(opt)
   if (is.null(opt$val)){
     print("No validation dataset was provided, stratified sampling will be performed
           on the training dataset")
-    library(caret)
     xtrain_fool <- xtrain
     ytrain_fool <- ytrain
-    set.seed(1989)
     partition <- createDataPartition(ytrain[,1], times = 1, groups = 20, p = 0.7, list = TRUE)
     idx <- partition$Resample
     xtrain <- xtrain_fool[idx,]
@@ -85,7 +123,6 @@ main <- function(opt)
   # Standardization (Z-score) of all the predictors is performed, centering all the 
   # variables to zero with standard deviation of 1.
   ########################################################################################
-  library(caret)
   # Training
   xtrain.z <- scale(xtrain)
   xtrain.z <- as.data.frame(xtrain.z)
@@ -105,8 +142,6 @@ main <- function(opt)
   # demanded for SFs as well
   ########################################################################################
   
-  # Load Functions for models
-  source('models.R')
   print(paste("Learning Models..."))
   # LASSO
   lasso_model <- lasso(x = xtrain.z, y = ytrain)
@@ -209,6 +244,12 @@ main <- function(opt)
   dev.off()  
 }
 
+########################################################################################
+# ARGUMENTS INPUT  PROCESSING
+# This section performs input processing for the arguments that have to be passed and
+# should NOT be modified
+# ######################################################################################
+
 getParser <- function() {
   option_list = list(
     make_option(c("-a", "--train"), type = "character", default = NULL,
@@ -227,7 +268,7 @@ getParser <- function() {
 # then, get a parser, parse the arguments, and call main
 # You must first have sourced this file, so that getParser is in your environment
 # > opt_parser <- getParser()
-# > opt <- parse_args(opt_parser, args=c("--train", "mytrain.csv", "--val", "myval.csv"))
+# > opt <- parse_args(opt_parser, args=unlist(strsplit("--train mytrain.csv --val myval.csv", " ")))
 # > main(opt)
 #
 # When running from the command line, the option will become, by default, TRUE,
@@ -237,5 +278,6 @@ if (getOption('run.commandline', default=TRUE)) {
   opt_parser <- getParser();
   opt = parse_args(opt_parser);
   
+  set.seed(1234)
   main(opt)  
 }
