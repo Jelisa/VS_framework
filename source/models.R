@@ -133,6 +133,8 @@ krls_m <- function(x, y){
   #                      plots can be obtained
   #                      This object can be used to predict new values.
   
+  # KRLS also standardizes, but there is no parameter to avoid it if data is ready.
+  # Double-standardization does not hurt, anyway.
   krls_model <- KRLS::krls(X = as.matrix(x), y = y, whichkernel = "gaussian", 
                            print.level = 0)
   
