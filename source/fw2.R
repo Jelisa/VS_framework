@@ -122,7 +122,7 @@ main <- function(opt)
     xdes_val <- des_val[,2:des_n]
     ydes_val <- des_val[ndes]
   }
-  
+
   if(is.null(opt$sfs_new) | is.null(opt$des_new)){
     print("NO new data is provided")
   }
@@ -135,18 +135,11 @@ main <- function(opt)
       sfs_new <- read.csv(opt$sfs_new, header = TRUE)
       nsfs_new <- length(sfs_new)
       xsfs_new <- sfs_new[, 2:nsfs_new]
-      xsfs_new.z <- scale(xsfs_new)
-      xsfs_new.z <- as.data.frame(xsfs_new.z)
       
       # Descriptors
       des_new <- read.csv(opt$des_new, header = TRUE)
       ndes_new <- length(des_new)
       xdes_new <- des_new[, 2:ndes_new]
-      xdes_new.z <- scale(xdes_new)
-      xdes_new.z <- as.data.frame(xdes_new.z)
-      
-      # ALL
-      xall_new.z <- cbind(xsfs_new.z, xdes_new.z)    
     }
     else{
       # Scoring Functions 
@@ -154,53 +147,76 @@ main <- function(opt)
       nsfs_new_all <- length(sfs_new)
       nsfs_new <- nsfs_new_all - 1
       xsfs_new <- sfs_new[, 2:nsfs_new]
-      xsfs_new.z <- scale(xsfs_new)
-      xsfs_new.z <- as.data.frame(xsfs_new.z)
       ysfs_new <- sfs_new[nsfs_new_all]
-      colnames(ysfs_new)[1] <- "Experimental"
+
       # Descriptors
       des_new <- read.csv(opt$des_new, header = TRUE)
       ndes_new_all <- length(des_new)
       ndes_new <- ndes_new_all - 1
       xdes_new <- des_new[, 2:ndes_new]
-      xdes_new.z <- scale(xdes_new)
-      xdes_new.z <- as.data.frame(xdes_new.z)
       ydes_new <- des_new[ndes_new_all]
       ydes_new <- as.data.frame(ydes_new)
-      colnames(ydes_new)[1] <- "Experimental"
-      # ALL
-      xall_new.z <- cbind(xsfs_new.z, xdes_new.z)
     }
   }
   
   ########################################################################################
-  # Pre-process
+  # Pre-process Phase
   # Standardization (Z-score) of all the predictors is performed, centering all the 
-  # variables to zero with standard deviation on 1.
+  # variables to zero with standard deviation on 1. Use N as denominator for the standard
+  # deviation
   ########################################################################################
   # SFs
-  xsfs.z <- scale(xsfs)
+  sfs_standardization_center <- apply(xsfs, 2, mean)
+  sfs_xtrain_variance <- apply(xsfs, 2, var)
+  sfs_xtrain_datapoints <- nrow(xsfs)
+  sfs_standardization_scale <- sqrt((sfs_xtrain_datapoints-1)/sfs_xtrain_datapoints)*sqrt(sfs_xtrain_variance)
+  xsfs.z <- scale(xsfs, center=sfs_standardization_center, scale=sfs_standardization_scale)
   xsfs.z <- as.data.frame(xsfs.z)
-  xsfs_val.z <- scale(xsfs_val)
+  xsfs_val.z <- scale(xsfs_val, center=sfs_standardization_center, scale=sfs_standardization_scale)
   xsfs_val.z <- as.data.frame(xsfs_val.z)
   ysfs <- as.data.frame(ysfs)
   ysfs_val <- as.data.frame(ysfs_val)
+
+  if(!is.null(opt$sfs_new) & !is.null(opt$des_new)) {
+    xsfs_new.z <- scale(xsfs_new, center=sfs_standardization_center, scale=sfs_standardization_scale)
+    xsfs_new.z <- as.data.frame(xsfs_new.z)
+  }
+  
   colnames(ysfs)[1] <- "Experimental"
   colnames(ysfs_val)[1] <- "Experimental"
+  if (!is.null(opt$new_data)) {
+    colnames(ysfs_new)[1] <- "Experimental"
+  }
   
   # Descriptors
-  xdes.z <- scale(xdes)
+  des_standardization_center <- apply(xdes, 2, mean)
+  des_xtrain_variance <- apply(xdes, 2, var)
+  des_xtrain_datapoints <- nrow(xdes)
+  des_standardization_scale <- sqrt((des_xtrain_datapoints-1)/des_xtrain_datapoints)*sqrt(des_xtrain_variance)
+  xdes.z <- scale(xdes, center=des_standardization_center, scale=des_standardization_scale)
   xdes.z <- as.data.frame(xdes.z)
-  xdes_val.z <- scale(xdes_val)
+  xdes_val.z <- scale(xdes_val, center=des_standardization_center, scale=des_standardization_scale)
   xdes_val.z <- as.data.frame(xdes_val.z)
+
+  if(!is.null(opt$sfs_new) & !is.null(opt$des_new)) {
+    xdes_new.z <- scale(xdes_new, center=des_standardization_center, scale=des_standardization_scale)
+    xdes_new.z <- as.data.frame(xdes_new.z)
+  }
+  
   colnames(ydes)[1] <- "Experimental"
   colnames(ydes_val)[1] <- "Experimental"
+  if(!is.null(opt$sfs_new) & !is.null(opt$des_new) & !is.null(opt$new_data)) {
+    colnames(ydes_new)[1] <- "Experimental"
+  }
   
   # ALL
   xall.z <- cbind(xsfs.z, xdes.z)
   yall <- ydes
   xall_val.z <- cbind(xsfs_val.z, xdes_val.z)
   yall_val <- ydes_val
+  if(!is.null(opt$sfs_new) & !is.null(opt$des_new)) {
+    xall_new.z <- cbind(xsfs_new.z, xdes_new.z)    
+  }
   
   
   ########################################################################################

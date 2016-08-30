@@ -114,26 +114,35 @@ main <- function(opt)
     newdata <- read.csv(opt$newdata, header = TRUE)
     n_new <- length(newdata)
     xnew <- newdata[, 2:n_new]
-    xnew.z <- scale(xnew)
-    xnew.z <- as.data.frame(xnew.z)
   }
   
   ########################################################################################
   # Pre-process
   # Standardization (Z-score) of all the predictors is performed, centering all the 
-  # variables to zero with standard deviation of 1.
+  # variables to zero with standard deviation of 1. Use N as denominator for the standard
+  # deviation
   ########################################################################################
-  # Training
-  xtrain.z <- scale(xtrain)
+  # Training. It fixes the center and scale for all other datasets
+  standardization_center <- apply(xtrain, 2, mean)
+  xtrain_variance <- apply(xtrain, 2, var)
+  xtrain_datapoints <- nrow(xtrain)
+  standardization_scale <- sqrt((xtrain_datapoints-1)/xtrain_datapoints)*sqrt(xtrain_variance)
+  xtrain.z <- scale(xtrain, center=standardization_center, scale=standardization_scale)
   xtrain.z <- as.data.frame(xtrain.z)
   ytrain <- as.data.frame(ytrain)
   colnames(ytrain)[1] <- "Experimental"
   
   # Validation
-  xval.z <- scale(xval)
+  xval.z <- scale(xval, center=standardization_center, scale=standardization_scale)
   xval.z <- as.data.frame(xval.z)
   yval <- as.data.frame(yval)
   colnames(yval)[1] <- "Experimental"
+  
+  # New data
+  if(!is.null(opt$sfs_new) & !is.null(opt$des_new)) {
+    xnew.z <- scale(xnew, center=standardization_center, scale=standardization_scale)
+    xnew.z <- as.data.frame(xnew.z)
+  }
   
   
   ########################################################################################
