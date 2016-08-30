@@ -154,13 +154,13 @@ main <- function(opt)
   print(paste("Learning Models..."))
   # LASSO
   lasso_model <- lasso(x = xtrain.z, y = ytrain)
-  lasso_error <- sqrt(mean(lasso_model$lasso_cv$cvm))
+  lasso_error <- lasso_model$lasso_cv_rmse
   # Elastic Net
   eNet_model <- eNet(xtrain.z, ytrain)
-  eNet_error <- sqrt(mean(eNet_model$eNet_cv$cvm))
+  eNet_error <- eNet_model$eNet_cv_rmse
   # GAM
   gam_model <- gam_m(xtrain.z, ytrain)
-  gam_error <- sqrt(mean(gam_model$gam_model$gcv.ubre))
+  gam_error <- gam_model$gam_cv_rmse
   # KRLS
   krls_model <- krls_m(xtrain.z, ytrain)
   krls_error <- predict(krls_model$krls_model, xtrain.z)

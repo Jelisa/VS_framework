@@ -320,7 +320,7 @@ main <- function(opt)
   lasso_sfs <- lasso(x = xsfs.z, y = ysfs)
   # Uncomment the bellow  line if you want to use the error in the training 
   # for choosing the best models
-  # lasso_error_sfs_train <- sqrt(mean(lasso_sfs$lasso_cv$cvm))
+  # lasso_error_sfs_train <- lasso_sfs$lasso_cv_rmse
   lasso_error_sfs_pred <- predict(lasso_sfs$lasso_model, newx = as.matrix(xsfs_val.z))
   lasso_error_sfs <- rmse(as.numeric(lasso_error_sfs_pred[,1]), ysfs_val[,1])
   
@@ -328,7 +328,7 @@ main <- function(opt)
   eNet_sfs <- eNet(x = xsfs.z, y = ysfs)
   # Uncomment the bellow  line if you want to use the error in the training 
   # for choosing the best models
-  # eNet_error_sfs_train <- sqrt(mean(eNet_sfs$eNet_cv$cvm))
+  # eNet_error_sfs_train <- eNet_sfs$eNet_cv_rmse
   eNet_error_sfs_pred <- predict(eNet_sfs$eNet_model, newx = as.matrix(xsfs_val.z))
   eNet_error_sfs <- rmse(as.numeric(eNet_error_sfs_pred[,1]), ysfs_val[,1])
   
@@ -336,7 +336,7 @@ main <- function(opt)
   gam_sfs <- gam_m(xsfs.z, ysfs)
   # Uncomment the bellow  line if you want to use the error in the training 
   # for choosing the best models
-  # gam_error_sfs_train <- sqrt(mean(gam_sfs$gam_model$gcv.ubre))
+  # gam_error_sfs_train <- gam_sfs$gam_cv_rmse
   gam_error_sfs_pred <- predict(gam_sfs$gam_model,xsfs_val.z)
   gam_error_sfs <- rmse(as.numeric(gam_error_sfs_pred), ysfs_val[,1])
   

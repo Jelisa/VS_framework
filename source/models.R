@@ -40,7 +40,9 @@ lasso <- function(x, y){
   lasso_cv <- cv.glmnet(x = as.matrix(x), y = y[,1], alpha = 1, standardize=FALSE)
   lasso_model <- glmnet(x = as.matrix(x), y = y[,1], alpha = 1, standardize=FALSE,
                         lambda = lasso_cv$lambda.1se)
-  return(list(lasso_cv = lasso_cv, lasso_model = lasso_model))
+  lambda.1se_index <- which.min(abs(lasso_cv$lambda - lasso_cv$lambda.1se))
+  lambda.1se_cv_rmse <- sqrt(lasso_cv$cvm[lambda.1se_index])
+  return(list(lasso_cv = lasso_cv, lasso_model = lasso_model, lasso_cv_rmse = lambda.1se_cv_rmse))
 }
 
 
@@ -65,7 +67,9 @@ eNet <- function(x, y){
   eNet_cv <- cv.glmnet(as.matrix(x), y[,1], alpha = 0.5, standardize=FALSE)
   eNet_model <- glmnet(as.matrix(x), y[,1], alpha = 0.5, standardize=FALSE,
                        lambda = eNet_cv$lambda.1se)
-  return(list(eNet_cv = eNet_cv, eNet_model = eNet_model))
+  lambda.1se_index <- which.min(abs(eNet_cv$lambda - eNet_cv$lambda.1se))
+  lambda.1se_cv_rmse <- sqrt(eNet_cv$cvm[lambda.1se_index])
+  return(list(eNet_cv = eNet_cv, eNet_model = eNet_model, eNet_cv_rmse = lambda.1se_cv_rmse))
 }
 
 
@@ -109,7 +113,7 @@ gam_m <- function(x,y){
   # Fit GAM Model
   gam_model <- mgcv::gam(formula, data= cbind(y, x), select =T,
                          method = "GCV.Cp")
-  return(list(gam_model = gam_model))
+  return(list(gam_model = gam_model, gam_cv_rmse = sqrt(gam_model$gcv.ubre[["GCV.Cp"]])))
 }
 
 
@@ -137,7 +141,8 @@ krls_m <- function(x, y){
   # Double-standardization does not hurt, anyway.
   krls_model <- KRLS::krls(X = as.matrix(x), y = y, whichkernel = "gaussian", 
                            print.level = 0)
-  
+
+  # TODO: Decide on best measure of KRLS LOOCV error  
   return(list(krls_model=krls_model))
 }
 
@@ -165,7 +170,10 @@ ridge_stack <- function(xmodels, y){
   ridge_cv <- cv.glmnet(as.matrix(xmodels), k = 1, y[,1], alpha = 0, standardize=FALSE)
   ridge_model <- glmnet(as.matrix(xmodels),  y[,1], alpha = 0, standardize=FALSE,
                         lambda = ridge_cv$lambda.1se)
-  return(list(ridge_cv = ridge_cv, ridge_model = ridge_model))
+  lambda.1se_index <- which.min(abs(ridge_cv$lambda - ridge_cv$lambda.1se))
+  lambda.1se_cv_rmse <- sqrt(ridge_cv$cvm[lambda.1se_index])
+
+  return(list(ridge_cv = ridge_cv, ridge_model = ridge_model, ridge_cv_rmse <- lambda.1se_cv_rmse))
   
 }
 
