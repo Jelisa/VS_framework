@@ -363,7 +363,7 @@ main <- function(opt)
     best_train_sfs <- predict(lasso_sfs$lasso_model, newx = xsfs.z)
     best_val_sfs <- predict(lasso_sfs$lasso_model, xsfs_val.z)
     if(!is.null(opt$sfs_new) & !is.null(opt$des_new)){
-      best_new_sfs <- predict(lasso_sds$lasso_model, newx = xsfs_new.z)
+      best_new_sfs <- predict(lasso_sfs$lasso_model, newx = xsfs_new.z)
     }
   }
   
