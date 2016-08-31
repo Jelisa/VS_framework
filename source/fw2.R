@@ -409,14 +409,22 @@ main <- function(opt)
   # Models For Training
   xmodels_train <- cbind(best_train_sfs, best_train_all)
   colnames(xmodels_train) <- c("Best_sfs", "Best_all")
-  xmodels_train <- scale(xmodels_train)
+
+  stacking_standardization_center <- apply(xmodels_train, 2, mean)
+  xmodels_train_variance <- apply(xmodels_train, 2, var)
+  xmodels_train_datapoints <- nrow(xmodels_train)
+  stacking_standardization_scale <- sqrt((xmodels_train_datapoints-1)/xmodels_train_datapoints)*sqrt(xmodels_train_variance)
+  
+  xmodels_train <- scale(xmodels_train, center=stacking_standardization_center,
+                         scale=stacking_standardization_scale)
   xmodels_train <- as.data.frame(xmodels_train)
   ymodels_train <- ysfs
   
   # Models For Validation
   xmodels_val <- cbind(best_val_sfs, best_val_all)
   colnames(xmodels_val) <- c("Best_sfs", "Best_all")
-  xmodels_val <- scale(xmodels_val)
+  xmodels_val <- scale(xmodels_val, center=stacking_standardization_center,
+                       scale=stacking_standardization_scale)
   xmodels_val <- as.data.frame(xmodels_val)
   ymodels_val <- ysfs_val
   
@@ -424,7 +432,8 @@ main <- function(opt)
   if(!is.null(opt$sfs_new) & !is.null(opt$des_new)){
     xmodels_new <- cbind(best_new_sfs, best_new_all)
     colnames(xmodels_new) <- c("Best_sfs", "Best_all")
-    xmodels_new <- scale(xmodels_new)
+    xmodels_new <- scale(xmodels_new, center=stacking_standardization_center,
+                         scale=stacking_standardization_scale)
     xmodels_new <- as.data.frame(xmodels_new)
   }
   
