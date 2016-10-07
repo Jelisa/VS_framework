@@ -219,6 +219,14 @@ def check_ligand(lig_filename):
     if changes:
         with open(lig_filename, 'w') as lig_file:
             lig_file.write(new_lig)
+    command2call2 = mutations_program_command.format(lig_filename) + "-opdb {}".format(lig_filename)
+    try:
+        check_output(command2call2.split())
+    except CalledProcessError as e:
+        logging.critical("ERROR: the program can't call the mutations_program.py")
+        logging.info("Terminating the program.")
+        logging.shutdown()
+        sys.exit("The program can't execute the mutations_program.py")
     return peptidic_ligand
 
 
@@ -461,6 +469,10 @@ for filename in input_files:
     except OSError:
         logging.info("The folder {} already exists. So it won't be created again.".format(hetero_folder))
     output_folder = new_general_subfolder + "output_obc"
+    try:
+        os.mkdir(output_folder)
+    except OSError:
+        logging.info("The folder {} already exists. So it won't be created again.".format(output_folder))
     pele_data = args.pele_folders + os.sep + "Data"
     link2data = new_general_subfolder + "Data"
     try:
@@ -614,6 +626,7 @@ for filename in input_files:
     # we convert it to .mae format, so we can create the template. Unless the ligand it's a peptide in
     # which case we don't need to generate a template.
     if not no_need4template:
+
         ligand_template_filename = create_template_and_rotamerlib(ligand_filename, hetero_folder, rotamerlibs_folder)
         if not ligand_template_filename:
             errors_counter += 1
@@ -629,7 +642,7 @@ for filename in input_files:
                 if "exists" in e:
                     pass
                 else:
-                    "SHIT."
+                    print "SHIT."
             copy_obc_param = copy_obc_folder + "solventParamsHCTOBC.txt"
             copyfile(original_obc_param, copy_obc_param)
             command2call = obc_param_command.format(ligand_template_filename)
@@ -648,6 +661,7 @@ for filename in input_files:
                     obc_text = "".join(obc_template_file.readlines()) + "\n"
                 with open(copy_obc_param, 'a') as obc_param_file:
                     obc_param_file.write(obc_text)
+                os.remove(obc_command_output_file)
             else:
                 logging.error(" - ERROR: The OBC parameters required couldn't be generated.")
                 errors_counter += 1
