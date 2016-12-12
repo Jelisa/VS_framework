@@ -99,11 +99,18 @@ def command_execution_failed(command, error_message):
 
 
 def structures_conversion_pdb_to_format(initial_filename, output_format, conversor_command, warnings_count,
-                                        executing_folder, keyword):
+                                        executing_folder, keyword, rewrite):
     if args.debug:
         print "wd:", executing_folder
     general_name = initial_filename.split(".pdb")[0]
     output_name = general_name + output_format
+    if os.path.isfile(output_name):
+        if not rewrite:
+            logging.info(" - The file {0} already exists it won't be rewritten").format(output_name)
+            return output_name, warnings_count
+        else:
+            logging.info(" - The file {0} already exists it will be rewritten").format(output_name)
+        logging.info(" - The file already exists")
     command2execute = conversor_command.format(initial_filename, output_name)
     try:
         if args.debug:
@@ -113,14 +120,14 @@ def structures_conversion_pdb_to_format(initial_filename, output_format, convers
         if first_time_execution[keyword]:
             command_execution_failed(command2execute, e)
         else:
-            logging.info(" - Command {0} failed.".format(command2execute))
+            logging.warning(" - WARNING: Command {0} failed.".format(command2execute))
             warnings_count += 1
     else:
         first_time_execution[keyword] = False
         if output_format in [".mol2", ".sdf"]:
             if "0 molecules converted" in conversor_output:
                 obabel_error = "Obabel hasn't converted any molecule from file {0}".format(initial_filename)
-                # print "Warning: Obabel hasn't converted any molecule from file {0}.".format(initial_filename)
+                logging.warning("Warning: Obabel hasn't converted any molecule from file {0}.".format(initial_filename))
                 warnings_count += 1
 
     return output_name, warnings_count
@@ -288,9 +295,9 @@ def xscore_execution(receptor_filename, ligand_filename, execution_folder):
     """
     if args.debug:
         print "executing xscore"
-        # print "receptor:", receptor_filename
-        # print "ligand"
-        print "wd: ",execution_folder
+        print "receptor: '{0}'".format(receptor_filename)
+        print "ligand: '{0}'".format(ligand_filename)
+        print "wd: ", execution_folder
     xscore_command = "xscore -score {0} {1}".format(receptor_filename, ligand_filename)
     try:
         xscore_output = check_output(xscore_command.split(), cwd=execution_folder, stderr=STDOUT)
@@ -305,7 +312,12 @@ def xscore_execution(receptor_filename, ligand_filename, execution_folder):
                 command_execution_failed(xscore_command, xscore_output)
             else:
                 logging.info(" - Error while computing Xscore.")
+        else:
+            output_filename = execution_folder + "xscore_out.txt"
+            with open(output_filename, "w") as outfile:
+                outfile.write(xscore_output)
         first_time_execution["xscore"] = False
+
 
 
 def binana_execution(receptor_filename, ligand_filename, execution_folder):
@@ -353,6 +365,7 @@ parser.add_argument("-experimental_deltag", default="")
 parser.add_argument("-rf_score_output_file", default=-2)
 parser.add_argument("-debug", default=False, action="store_true")
 parser.add_argument("-log_file", default="scoring_function_computations_log.txt")
+parser.add_argument("-rewrite", action="store_true")
 args = parser.parse_args()
 
 logging.basicConfig(filename=args.log_file, format="%(message)s", level=logging.INFO, filemode="w")
@@ -374,6 +387,7 @@ prepare_receptor_path = "{0}bin/pythonsh {1}prepare_receptor4.py ".format(extern
                                                                           external_software_paths.vina_utilities)
 prepare_ligand_vina_command = prepare_ligand_path + "-l {0} -o {1}"
 prepare_receptor_vina_command = prepare_receptor_path + "-U nphs -U lps -U nonstdres -r {0} -o {1}"
+
 
 
 
@@ -475,8 +489,8 @@ if compute_autodock_vina:
                                                                                     vina_template_text))
     vina_template = Template(vina_template_text)
 
+deltag_values = {}
 if compute_rf_score:
-    deltag_values = {}
     logging.info("Remember that for RF-Score you still have to do the computation, this just prepares the input.")
     rf_score_name_deltag_dictio = {}
     if args.experimental_deltag:
@@ -489,7 +503,7 @@ if compute_rf_score:
                     line = line.split(";")
                 else:
                     line = line.split()
-                deltag_values[line[0].strip()] = line[1].strip()
+                deltag_values[line[1].strip()] = line[2].strip()
     else:
         logging.info("INFO: Note that no energies file has been given, since RF-Score needs energy values as "
                      "input the program will assign a dummy energy of 0 to all the systems")
@@ -506,10 +520,10 @@ for filename in args.input_files:
     # Since the structures have been extracted from the trajectory previously and the folder structure has been already
     # created we just need to extract all the files into the same folder as the input file.
 
-    input_file = "/".join(filename.split(os.sep)[:-1]) + os.sep
+    working_folder = os.sep.join(filename.split(os.sep)[:-1]) + os.sep
     if glide_subfolder:
         # noinspection PyUnboundLocalVariable
-        new_link = glide_structures_subfolder + minimum_filename
+        new_link = glide_structures_subfolder + basic_filename
         try:
             os.symlink(os.path.abspath(filename), new_link)
         except OSError as e:
@@ -518,7 +532,7 @@ for filename in args.input_files:
     logging.info(" - Separating ligand and protein")
     try:
         protein_filename_pdb, protein_with_waters_pdb, \
-        waters_filename_pdb, ligand_filename_pdb = extract_ligand(filename, minimum_filename, "Z", input_file)
+        waters_filename_pdb, ligand_filename_pdb = extract_ligand(filename, minimum_filename, "Z", working_folder)
     except TypeError:
         logging.error(" - This system will be discontinued, due to a problem in the "
                       "separation of the ligand and protein.")
@@ -537,8 +551,9 @@ for filename in args.input_files:
             logging.info(" - Converting waters to .mol2")
             waters_mol2_filename, warnings_counter = structures_conversion_pdb_to_format(waters_filename_pdb, ".mol2",
                                                                                          obabel_command,
-                                                                                         warnings_counter, input_file,
-                                                                                         "mol2")
+                                                                                         warnings_counter,
+                                                                                         working_folder, "mol2",
+                                                                                         args.rewrite)
         if warnings_counter > old_warnings:
             old_warnings = warnings_counter
     if ".pdb" not in ligand_filename_pdb:
@@ -558,59 +573,92 @@ for filename in args.input_files:
         logging.info(" - Converting ligand to .mol2")
         ligand_filename_mol2, warnings_counter = structures_conversion_pdb_to_format(ligand_filename_pdb, ".mol2",
                                                                                      obabel_command, warnings_counter,
-                                                                                     input_file,
-                                                                                     "obabel")
+                                                                                     working_folder, "obabel",
+                                                                                     args.rewrite)
         if warnings_counter > old_warnings:
             old_warnings = warnings_counter
         else:
             logging.info(" - Executing DSX")
-            dsx_execution(protein_filename_pdb, ligand_filename_mol2, input_file, waters_mol2_filename)
+            dsx_execution(protein_filename_pdb, ligand_filename_mol2, working_folder, waters_mol2_filename)
             logging.info(" - Executing Xscore")
             if waters_filename_pdb:
-                xscore_execution(protein_with_waters_pdb, ligand_filename_mol2, input_file)
+                xscore_execution(protein_with_waters_pdb, ligand_filename_mol2, working_folder)
             else:
-                xscore_execution(protein_filename_pdb, ligand_filename_mol2, input_file)
+                xscore_execution(protein_filename_pdb, ligand_filename_mol2, working_folder)
     elif compute_dsx:
         if args.debug:
             print 2
         logging.info(" - Converting ligand to .mol2")
         ligand_filename_mol2, warnings_counter = structures_conversion_pdb_to_format(ligand_filename_pdb, ".mol2",
                                                                                      obabel_command, warnings_counter,
-                                                                                     input_file,
-                                                                                     "obabel")
+                                                                                     working_folder, "obabel",
+                                                                                     args.rewrite)
         if warnings_counter > old_warnings:
             old_warnings = warnings_counter
         else:
             logging.info(" - Executing DSX")
-            dsx_execution(protein_filename_pdb, ligand_filename_mol2, input_file, waters_mol2_filename)
+            dsx_execution(protein_filename_pdb, ligand_filename_mol2, working_folder, waters_mol2_filename)
     elif compute_xscore:
         if args.debug:
             print 3
         ligand_filename_mol2, warnings_counter = structures_conversion_pdb_to_format(ligand_filename_pdb, ".mol2",
                                                                                      obabel_command, warnings_counter,
-                                                                                     input_file,
-                                                                                     "obabel")
+                                                                                     working_folder, "obabel",
+                                                                                     args.rewrite)
         if warnings_counter > old_warnings:
             old_warnings = warnings_counter
         else:
             logging.info(" - Executing Xscore")
-            xscore_execution(protein_with_waters_pdb, ligand_filename_mol2, input_file)
+            if waters_filename_pdb:
+                xscore_execution(protein_with_waters_pdb, ligand_filename_mol2, working_folder)
+            else:
+                xscore_execution(protein_filename_pdb, ligand_filename_mol2, working_folder)
     if compute_rf_score:
         if args.debug:
             print 4
         logging.info(" - Converting ligand to .sdf")
         ligand_filename_sdf, warnings_counter = structures_conversion_pdb_to_format(ligand_filename_pdb, ".sdf",
                                                                                     obabel_command, warnings_counter,
-                                                                                    input_file,
-                                                                                    "obabel")
+                                                                                    working_folder, "obabel",
+                                                                                    args.rewrite)
+        if args.debug:
+            print 9
+        # The real computation of RF-score is done manually.
+        logging.info(" - Preparing RF deltaG")
+        if deltag_values:
+            # noinspection PyUnboundLocalVariable
+            if minimum_filename in deltag_values.keys():
+                if args.debug:
+                    print 10
+                rf_score_name_deltag_dictio[minimum_filename] = deltag_values[minimum_filename]
+            else:
+                if args.debug:
+                    print 11
+                pattern = re.search(r"\w+_(\d+)_", minimum_filename)
+                if pattern is None:
+                    logging.warning(" - WARNING: The name couldn't be found in the deltaG file, "
+                                    "a dummy deltaG of 0 will be used for the system.")
+                    rf_score_name_deltag_dictio[minimum_filename] = 0
+                else:
+                    try:
+                        rf_score_name_deltag_dictio[minimum_filename] = deltag_values[pattern.group(1)]
+                    except KeyError:
+                       logging.warning(" - WARNING: The name couldn't be found in the deltaG file, "
+                                    "a dummy deltaG of 0 will be used for the system.")
+                       rf_score_name_deltag_dictio[minimum_filename] = 0
+
+        else:
+            if args.debug:
+                print 12
+            rf_score_name_deltag_dictio[minimum_filename] = 0
     if compute_autodock_vina and compute_binana:
         if args.debug:
             print 5
         logging.info(" - Converting ligand to .pdbqt")
         ligand_filename_pdbqt, warnings_counter = structures_conversion_pdb_to_format(ligand_filename_pdb, ".pdbqt",
                                                                                       prepare_ligand_vina_command,
-                                                                                      warnings_counter, input_file,
-                                                                                      "pdbqt")
+                                                                                      warnings_counter, working_folder,
+                                                                                      "pdbqt", args.rewrite)
         if warnings_counter > old_warnings:
             old_warnings = warnings_counter
         else:
@@ -621,27 +669,28 @@ for filename in args.input_files:
                                                                                             ".pdbqt",
                                                                                             prepare_receptor_vina_command,
                                                                                             warnings_counter,
-                                                                                            input_file, "pdbqt")
+                                                                                            working_folder, "pdbqt",
+                                                                                            args.rewrite)
             if warnings_counter > old_warnings:
                 old_warnings = warnings_counter
             else:
                 logging.info(" - Executing Vina")
                 vina_execution(ligand_filename_pdbqt, receptor_filename_pdbqt, args.vina_box_distance_to_ligand,
-                               input_file, keywords_in_the_vina_template, vina_template)
+                               working_folder, keywords_in_the_vina_template, vina_template)
                 logging.info(" - Executing Binana")
                 if args.debug:
                     print receptor_filename_pdbqt
                     print ligand_filename_pdbqt
-                    print input_file
-                binana_execution(receptor_filename_pdbqt, ligand_filename_pdbqt, input_file)
+                    print working_folder
+                binana_execution(receptor_filename_pdbqt, ligand_filename_pdbqt, working_folder)
     elif compute_autodock_vina:
         if args.debug:
             print 6
         logging.info(" - Converting ligand to .pdbqt")
         ligand_filename_pdbqt, warnings_counter = structures_conversion_pdb_to_format(ligand_filename_pdb, ".pdbqt",
                                                                                       prepare_ligand_vina_command,
-                                                                                      warnings_counter, input_file,
-                                                                                      "pdbqt")
+                                                                                      warnings_counter, working_folder,
+                                                                                      "pdbqt", args.rewrite)
         if warnings_counter > old_warnings:
             old_warnings = warnings_counter
         else:
@@ -650,21 +699,22 @@ for filename in args.input_files:
                                                                                             ".pdbqt",
                                                                                             prepare_ligand_vina_command,
                                                                                             warnings_counter,
-                                                                                            input_file, "pdbqt")
+                                                                                            working_folder, "pdbqt",
+                                                                                            args.rewrite)
             if warnings_counter > old_warnings:
                 old_warnings = warnings_counter
             else:
                 logging.info(" - Executing Vina")
                 vina_execution(ligand_filename_pdbqt, receptor_filename_pdbqt, args.vina_box_distance_to_ligand,
-                               input_file, keywords_in_the_vina_template, vina_template)
+                               working_folder, keywords_in_the_vina_template, vina_template)
     elif compute_binana:
         if args.debug:
             print 7
         logging.info(" - Converting ligand to .pdbqt")
         ligand_filename_pdbqt, warnings_counter = structures_conversion_pdb_to_format(ligand_filename_pdb, ".pdbqt",
                                                                                       prepare_ligand_vina_command,
-                                                                                      warnings_counter, input_file,
-                                                                                      "pdbqt")
+                                                                                      warnings_counter, working_folder,
+                                                                                      "pdbqt", args.rewrite)
         if warnings_counter > old_warnings:
             old_warnings = warnings_counter
         else:
@@ -673,12 +723,13 @@ for filename in args.input_files:
                                                                                             ".pdbqt",
                                                                                             prepare_ligand_vina_command,
                                                                                             warnings_counter,
-                                                                                            input_file, "pdbqt")
+                                                                                            working_folder, "pdbqt",
+                                                                                            args.rewrite)
             if warnings_counter > old_warnings:
                 old_warnings = warnings_counter
             else:
                 logging.info(" - Executing Binana")
-                binana_execution(receptor_filename_pdbqt, ligand_filename_pdbqt, input_file)
+                binana_execution(receptor_filename_pdbqt, ligand_filename_pdbqt, working_folder)
 
     if compute_mmgbsa:
         if args.debug:
@@ -686,34 +737,13 @@ for filename in args.input_files:
         logging.info(" - Converting complex to .mae")
         complex_filename_mae, warnings_counter = structures_conversion_pdb_to_format(basic_filename, ".mae",
                                                                                      schrodinger_pdb2mae_convert_command,
-                                                                                     warnings_counter, input_file,
-                                                                                     "mae")
+                                                                                     warnings_counter, working_folder,
+                                                                                     "mae", args.rewrite)
         if warnings_counter > old_warnings:
             old_warnings = warnings_counter
         else:
             logging.info(" - Executing mmgbsa")
-            mmgbsa_execution(complex_filename_mae, input_file, args.schrodinger_host, args.schrodinger_cpus)
-    if compute_rf_score:
-        if args.debug:
-            print 9
-        # The real computation of RF-score is done manually.
-        logging.info(" - Preparing RF deltaG")
-        if deltag_values:
-            # noinspection PyUnboundLocalVariable
-            if minimum_filename in deltag_values.keys():
-                if args.debug:
-                    print 10
-                rf_score_name_deltag_dictio[minimum_filename] = deltag_values
-            else:
-                if args.debug:
-                    print 11
-                logging.warning(" - WARNING: The name couldn't be found in the deltaG file, "
-                                "a dummy deltaG of 0 will be used for the system.")
-                rf_score_name_deltag_dictio[minimum_filename] = 0
-        else:
-            if args.debug:
-                print 12
-            rf_score_name_deltag_dictio[minimum_filename] = 0
+            mmgbsa_execution(complex_filename_mae, working_folder, args.schrodinger_host, args.schrodinger_cpus)
 
 if errors_counter == len(args.input_files):
     logging.critical("None of the systems could be processed.\nTerminating the program.")
