@@ -1,0 +1,17 @@
+dsx_files = "This option specifies the files to use for the extraction of the dsx values."
+xscore_files = "This option specifies the files to use for the extraction of the xscore values."
+binana_files = "This option specifies the files to use for the extraction of the binana values."
+mmgbsa_files = "This option specifies the files to use for the extraction of the mmgbsa values."
+rf_score_file = "This option specifies the files to use for the extraction of the rf_score values."
+vina_files = "This option specifies the files to use for the extraction of the vina values."
+glide_file = "This option specifies the file to use for the extraction of the glide values."
+energies_file = "This option specifies the file containing the experimental energies for all the systems."
+convert = "This option establishes the scoring functions to convert to energy value from pkd. " \
+          "DEFAULT: 'xscore', 'nn_score'"
+conversion_temperature = "The temperature value to use when converting from pkd to energy. DEFAULT: 300"
+conversion_r_value = "The r value to use when converting from pkd to energy. DEFAULT: 0.002"
+output_general_name = "The complete path to where the output should be written plus the prefix for the files."
+rotable_bonds_files = "The .pdbqt files to analyze and extract the rotable bonds from."
+log_file = "A complte filename for the log file. DEFAULT: sf_extraction_log.txt"
+mmgbsa_as_sf = "If this option is present the program will extract the total value of prime-mmgbsa as a " \
+               "scoring function, otherwise it will extract only the descriptors. DEFAULT: False"
