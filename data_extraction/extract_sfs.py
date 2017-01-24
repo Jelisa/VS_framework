@@ -430,7 +430,7 @@ parser.add_argument("-log_file", default="sf_extraction_log.txt", help=extract_s
 args = parser.parse_args()
 
 if not (args.dsx_files or args.xscore_files or args.binana_files or args.mmgbsa_files or
-            args.rf_score_file or args.vina_files or args.glide_file):
+        args.rf_score_file or args.vina_files or args.glide_file or args.pele_file or args.rotable_bonds_files):
     parser.error("No action requested. At least one of the scoring functions or descriptors should be provided.")
 
 logging.basicConfig(filename="sf_extraction_log.txt", format="%(message)s", level=logging.INFO, filemode="w")
