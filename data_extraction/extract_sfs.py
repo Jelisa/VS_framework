@@ -611,8 +611,8 @@ if args.glide_file:
 
 if args.pele_file:
     logging.info("Extracting pele score")
-    if not os.path.isfile(args.glide_file):
-        logging.warning(" # WARNING: The file {0} doesn't exist. It'll be skipped.".format(args.pele_file))
+    if not os.path.isfile(args.pele_file):
+        logging.warning(" # WARNING: The file '{0}' doesn't exist. It'll be skipped.".format(args.pele_file))
     else:
         with open(args.pele_file) as infile:
             csv_parser = csv.DictReader(infile, delimiter=",")
