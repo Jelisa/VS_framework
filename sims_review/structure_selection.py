@@ -69,7 +69,7 @@ parser.add_argument("-deltag", default=5, type=int, help=parameters_help.structu
 parser.add_argument("-ligand_chain", default="Z", help=parameters_help.structure_selection_ligand_chain_desc)
 parser.add_argument("-single_structure", default=False, action="store_true",
                     help=parameters_help.structure_selection_single_structure)
-parser.add_argument("-initial_energies", action="store_true")
+parser.add_argument("-initial_energies", action="store_true", help=parameters_help.initial_energies)
 parser.add_argument("-output_folder", default="./")
 parser.add_argument("-only_statistics", default=False, action="store_true",
                     help=parameters_help.structure_selection_only_statistics)

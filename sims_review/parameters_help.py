@@ -18,4 +18,6 @@ structure_selection_single_structure = "This option acts as a flag, if present t
                                        "criteria {}\nDEFAULT: False".format(structure_Selection_criteria)
 structure_selection_only_statistics = "This option acts as a flag, if present the program will only compute the " \
                                       "statistics with the selected criteria.\nDEFAULT: False"
+initial_energies = "When this option is present the script will write the file initial_PELE_binding_energies.csv " \
+                   "that contains the PELE binding energy for the initial complex given to PELE."
 # structure_selection_output_desc = "The"
