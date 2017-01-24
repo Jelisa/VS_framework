@@ -16,7 +16,7 @@ import prody
 import parameters_help
 
 
-def extract_minimum_energy_models(report_filename, nuber_skipped_systems):
+def extract_minimum_energy_models(report_filename, number_skipped_systems, deltag_limit):
     # This block will analyze the report file
     report_header = []
     report_values = []
@@ -42,7 +42,7 @@ def extract_minimum_energy_models(report_filename, nuber_skipped_systems):
                             values.append(v)
                 report_values.append(values)
     if not report_values:
-        nuber_skipped_systems += 1
+        number_skipped_systems += 1
         logging.error(" The report file was empty but for the header.")
         return False
     report_values_array = np.asarray(report_values)
@@ -55,7 +55,7 @@ def extract_minimum_energy_models(report_filename, nuber_skipped_systems):
     # print np.where(report_values_array[:, binding_energy_index] <= minimum_energy_value +
     #                                              args.deltag)[0]
     systems2use = [v for v in np.where(report_values_array[:, binding_energy_index] <= minimum_energy_value +
-                                       args.deltag)[0] if v != minimum_energy_model]
+                                       deltag_limit)[0] if v != minimum_energy_model]
 
     if len(systems2use) == 0:
         logging.info(" There's no other pose within 5 Kcal of the best pose.")
@@ -69,6 +69,7 @@ parser.add_argument("-deltag", default=5, type=int, help=parameters_help.structu
 parser.add_argument("-ligand_chain", default="Z", help=parameters_help.structure_selection_ligand_chain_desc)
 parser.add_argument("-single_structure", default=False, action="store_true",
                     help=parameters_help.structure_selection_single_structure)
+parser.add_argument("-initial_energies", action="store_true")
 parser.add_argument("-output_folder", default="./")
 parser.add_argument("-only_statistics", default=False, action="store_true",
                     help=parameters_help.structure_selection_only_statistics)
@@ -89,7 +90,9 @@ if output_folder[-1] != os.sep:
 skipped_systems = 0
 statistics = {}
 energies_values = {}
+initial_energies_values = {}
 for folder in args.input:
+    # Adding the OS separator to the folder path
     if folder[-1] != os.sep:
         folder += os.sep
     logging.info("Working with the folder: {0}".format(folder))
@@ -97,6 +100,7 @@ for folder in args.input:
         logging.error(" The folder {0} doesn't exist, thus it will be ignored.".format(folder))
         skipped_systems += 1
         continue
+    # Checking if the folder to look for exists if not ignore the system.
     pele_report_filename = ""
     trajectory_filename = ""
     for filename in os.listdir(folder):
@@ -108,9 +112,10 @@ for folder in args.input:
         logging.error(" Report or trajectory file missing the system will be discontinued.")
         skipped_systems += 1
         continue
-    pattern = re.search(r'{0}*(\w+_\d+{0}).*'.format(os.sep), folder)
+    # obtain the simulation id from the folder path.
+    pattern = re.search(r'{0}*(\w+_\d+){0}.*'.format(os.sep), folder)
     if pattern is None:
-        if folder.split(os.sep)[-2] != "output":
+        if folder.split('/')[-2] != "output":
             folder_name = folder.split('/')[-2]
         else:
             folder_name = folder.split('/')[-3]
@@ -119,11 +124,13 @@ for folder in args.input:
 
     try:
         models_2_use, pele_minimum_energy_model, pele_energies_values_array,\
-            pele_binding_energy_index, pele_minimum_energy_value = extract_minimum_energy_models(
-                pele_report_filename, skipped_systems)
+            pele_binding_energy_index, pele_minimum_energy_value = extract_minimum_energy_models(pele_report_filename,
+                                                                                                 skipped_systems,
+                                                                                                 args.deltag)
     except ValueError:
         print "error"
         continue
+    initial_energies_values[folder_name] = pele_energies_values_array[0][pele_binding_energy_index]
     trajectory = prody.parsePDB(trajectory_filename)
     if args.single_structure:
         models_2_use = [pele_minimum_energy_model]
@@ -170,14 +177,21 @@ for folder in args.input:
 if args.only_statistics:
     statistics_filename = "general_statistics.csv"
     energies_filename = "minimum_PELE_binding_energies.csv"
+    initial_energies_filename = "initial_PELE_binding_energies.csv"
 else:
     statistics_filename = output_folder + "general_statistics.csv"
     energies_filename = output_folder + "minimum_PELE_binding_energies.csv"
+    initial_energies_filename = output_folder + "initial_PELE_binding_energies.csv"
 with open(statistics_filename, 'w') as outfile:
     outfile.write("\n".join(["{0},{1}".format(key[:-1], value) for key, value in statistics.iteritems()]))
 # print energies_values
 with open(energies_filename, 'w') as outfile:
+    outfile.write("ID,pele_score\n")
     outfile.write("\n".join(["{0},{1}".format(key, value) for key, value in energies_values.iteritems()]))
-
+if args.initial_energies:
+    with open(initial_energies_filename, 'w') as outfile:
+        outfile.write("ID,pele_score\n")
+        outfile.write("\n".join(["{0},{1}".format(key, value)
+                                 for key, value in initial_energies_values.iteritems()]))
 logging.info("{} : Program finished correctly.".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M")))
 logging.shutdown()
