@@ -25,6 +25,7 @@ import datetime
 import re
 from math import log
 import sys
+import csv
 
 import extract_sf_help
 
@@ -292,7 +293,7 @@ def merge_data(data2use, type_of_data, systems2use, energies_dictio, output_name
         text = ""
         for idx, system in enumerate(sorted(systems2use)):
             try:
-                # print system, keyword, dictionary
+                print system, keyword, dictionary
                 keys2use, values2use = process_values(dictionary, system, keyword)
                 if not keys2use:
                     return False
@@ -415,6 +416,8 @@ parser.add_argument("-mmgbsa_files", default=[], nargs="+", help=extract_sf_help
 parser.add_argument("-rf_score_file", default="", help=extract_sf_help.rf_score_file)
 parser.add_argument("-vina_files", default=[], nargs="+", help=extract_sf_help.vina_files)
 parser.add_argument("-glide_file", default="", help=extract_sf_help.glide_file)
+parser.add_argument("-pele_file", default="", help=extract_sf_help.pele_file)
+parser.add_argument("-mmgbsa_as_sf", action="store_true", help=extract_sf_help.mmgbsa_as_sf)
 parser.add_argument("-rotable_bonds_files", default=[], nargs="+", help=extract_sf_help.rotable_bonds_files)
 parser.add_argument("-energies_file", default=[], help=extract_sf_help.energies_file)
 parser.add_argument("-convert", "-convert2deltaG", nargs="+", default=["xscore", "nn_score"],
@@ -422,7 +425,6 @@ parser.add_argument("-convert", "-convert2deltaG", nargs="+", default=["xscore",
 parser.add_argument("-conversion_temperature", "-temperature", type=int, default=300,
                     help=extract_sf_help.conversion_temperature)
 parser.add_argument("-conversion_r_value", "-R", default=0.002, help=extract_sf_help.conversion_r_value)
-parser.add_argument("-mmgbsa_as_sf", action="store_true", help=extract_sf_help.mmgbsa_as_sf)
 parser.add_argument("-output_general_name", required=True, help=extract_sf_help.output_general_name)
 parser.add_argument("-log_file", default="sf_extraction_log.txt", help=extract_sf_help.log_file)
 args = parser.parse_args()
@@ -502,6 +504,7 @@ if args.mmgbsa_files:
             descriptors["mmgbsa"][pdb_code] = mmgbsa_values
             if args.mmgbsa_as_sf:
                 scoring_functions["mmgbsa"][pdb_code] = mmgbsa_score
+
 if args.rotable_bonds_files:
     try:
         descriptors["structural"]
@@ -524,6 +527,7 @@ if args.rotable_bonds_files:
                 pass
             else:
                 descriptors["structural"][pdb_code]["rotable_bonds"] = pattern.group(1)
+
 if args.rf_score_file:
     logging.info("Extracting rf_score values")
     scoring_functions["rf_score"] = {}
@@ -560,6 +564,7 @@ if args.dsx_files:
             pass
         else:
             scoring_functions["dsx"][pdb_code] = dsx_values
+
 if args.xscore_files:
     # print 'here'
     scoring_functions["xscore"] = {}
@@ -603,6 +608,15 @@ if args.glide_file:
         if not scoring_functions["glide"]:
             logging.error(" # ERROR: Couldn't find any line with the pattern used in this script to extract "
                           "the scores from the log file of xglide script.")
+
+if args.pele_file:
+    logging.info("Extracting pele score")
+    if not os.path.isfile(args.glide_file):
+        logging.warning(" # WARNING: The file {0} doesn't exist. It'll be skipped.".format(args.pele_file))
+    else:
+        with open(args.pele_file) as infile:
+            csv_parser = csv.DictReader(infile, delimiter=",")
+            scoring_functions["pele"] = {line["ID"].split(os.sep)[-1]: line["pele_score"] for line in csv_parser}
 
 logging.info("Finding the systems with all the scoring functions")
 systems_with_all_sfs_descriptors = set()

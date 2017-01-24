@@ -15,3 +15,4 @@ rotable_bonds_files = "The .pdbqt files to analyze and extract the rotable bonds
 log_file = "A complte filename for the log file. DEFAULT: sf_extraction_log.txt"
 mmgbsa_as_sf = "If this option is present the program will extract the total value of prime-mmgbsa as a " \
                "scoring function, otherwise it will extract only the descriptors. DEFAULT: False"
+pele_file = "The pele containing the scores to use"
