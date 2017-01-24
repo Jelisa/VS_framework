@@ -21,8 +21,9 @@ from string import Template
 from subprocess import check_output, CalledProcessError, check_call, STDOUT
 from tempfile import mkdtemp
 import numpy as np
-from modules import module
+# from modules import module
 
+import enviroment_parameters
 import help_descriptions
 from constant_values import atomic_table_weights, accepted_formats
 
@@ -249,28 +250,27 @@ parser.add_argument("-input_files", "-input", required=True, nargs="+", help=hel
 parser.add_argument("-receptor", default="", help=help_descriptions.receptor_desc)
 parser.add_argument("-subfolders_path", default=".", help=help_descriptions.subfolder_path_desc)
 parser.add_argument("-log_file", default="log.txt", help=help_descriptions.log_file_desc)
-parser.add_argument("-pele_folders", default="/home/kqtw353/stay/external_software/PELErev12349",
+parser.add_argument("-pele_folders", default=enviroment_parameters.pele_folders,
                     help=help_descriptions.pele_folder_desc)
-parser.add_argument("-debug", default=False, action="store_true", help=help_descriptions.debug_desc)
-parser.add_argument("-not_interactive", default=False, action="store_true",
-                    help=help_descriptions.not_interactive_desc)
+parser.add_argument("-debug", action="store_true", help=help_descriptions.debug_desc)
+parser.add_argument("-not_interactive", action="store_true", help=help_descriptions.not_interactive_desc)
 parser.add_argument("-schrodinger_path",
-                    default="/opt/az/schrodinger/schrodinger_suite/2016.03",
-                    help=help_descriptions.schrodinger_path_desc)
-parser.add_argument("-plop_path", default="/home/kqtw353/stay/work/PlopRotTemp/PlopRotTemp.py",
-                    help=help_descriptions.plop_path_desc)
+                    default=enviroment_parameters.schrodinger_path, help=help_descriptions.schrodinger_path_desc)
+parser.add_argument("-plop_path", default=enviroment_parameters.plop_path, help=help_descriptions.plop_path_desc)
 parser.add_argument("-conf_template", "-conf_file_template",
-                    default="/home/kqtw353/stay/work/conformational_search_pele_template.conf",
+                    default=enviroment_parameters.conformational_template,
                     help=help_descriptions.template_desc)
-parser.add_argument("-pele_license", default="/home/kqtw353/stay/external_software/PELErev12279",
+parser.add_argument("-pele_license", default=enviroment_parameters.pele_license_path,
                     help=help_descriptions.pele_license_desc)
-parser.add_argument("-every", "-fix_every_x_atoms", default=1, type=int, help=help_descriptions.every_desc)
-parser.add_argument("-constraint", "-constraint_strength", default=0.2, help=help_descriptions.constraint_desc)
-parser.add_argument("-atoms2conStraint", default=[" CA "], nargs='+',
+parser.add_argument("-every", "-fix_every_x_atoms", default=enviroment_parameters.default_every,
+                    type=int, help=help_descriptions.every_desc)
+parser.add_argument("-constraint", "-constraint_strength", default=enviroment_parameters.constraints_strength,
+                    help=help_descriptions.constraint_desc)
+parser.add_argument("-atoms2conStraint", default=enviroment_parameters.atoms2apply_constraints_default, nargs='+',
                     help=help_descriptions.atoms2constraint_desc)
-parser.add_argument("-mutations_program_path", default="/home/kqtw353/stay/work/mutations_program/mutations_program.py",
+parser.add_argument("-mutations_program_path", default=enviroment_parameters.mutations_program_path,
                     help=help_descriptions.mutations_program_path_desc)
-parser.add_argument("-obc_param_generator", default="/home/kqtw353/stay/work/OBCparamsgen/solventOBCParamsGenerator.py",
+parser.add_argument("-obc_param_generator", default=enviroment_parameters.obc_param_generator_path,
                     help=help_descriptions.obc_param_generator_desc)
 # parser.add_argument("-sub_template", default="./submit_template.sh")
 args = parser.parse_args()
