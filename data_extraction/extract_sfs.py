@@ -293,7 +293,7 @@ def merge_data(data2use, type_of_data, systems2use, energies_dictio, output_name
         text = ""
         for idx, system in enumerate(sorted(systems2use)):
             try:
-                print system, keyword, dictionary
+                # print system, keyword, dictionary
                 keys2use, values2use = process_values(dictionary, system, keyword)
                 if not keys2use:
                     return False
