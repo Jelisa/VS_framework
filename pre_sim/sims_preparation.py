@@ -1,7 +1,6 @@
 #!usr/bin/python
 
 # TODO: Change the call to something that grabs the outputs to process them
-# TODO: Check the calls and skip a system if it fails at some point, but if the failure is due to the program path exit.
 
 """"
 This program prepares the complexes and files to launch PELE simulations.
@@ -26,6 +25,39 @@ import numpy as np
 import enviroment_parameters
 import help_descriptions
 from constant_values import atomic_table_weights, accepted_formats
+
+
+def createfolder(folder2create_name):
+    """
+    This function tries to create the folder and catches the errors.
+    :param folder2create_name:
+    :return: void
+    """
+    try:
+        os.mkdir(folder2create_name)
+    except OSError as e:
+        if e[1] == "File exists":
+            logging.info("The folder {0} already exists. So it won't be created again.".format(folder2create_name))
+        else:
+            logging.error("The folder {0} couldn't be created.".format(folder2create_name))
+    else:
+        logging.info("   - Folder created correctly")
+
+
+def createsymboliclink(original, link):
+    """
+    This function tries to create the folder and catches the errors.
+    :param original: a string containing the path of the original folder.
+    :param link: a string containing the path  where the link should be generated.
+    :return: void
+    """
+    try:
+        os.symlink(original, link)
+    except OSError as e:
+        if e[1] == "File exists":
+            logging.info("The link {} already exists. So it won't be created again.".format(link2data))
+        else:
+            logging.error("The link {} couldn't be created.".format(link2data))
 
 
 def create_template_and_rotamerlib(initial_pdb, template_folder, rotamer_library_folder, out):
@@ -285,30 +317,30 @@ logging.info("{} : Program starting".format(datetime.datetime.now().strftime("%Y
 
 # These are the commands that will be executed during the program, they change depending
 # on where the program is being executed AZ or BSC
+# Commands AZ
 # This line is mandatory only for AZ, as the import
 # The first thing is to load the schrodinger module
-module("load", "schrodinger/2016.01")
+# module("load", "schrodinger/2016.01")
 # Then we load the commands from the constant values depending on where we are.
-# Commands AZ
-schrodinger_mae2pdb_convert_command = "pdbconvert -imae {} -opdb {}"
-schrodinger_pdb2mae_convert_command = "pdbconvert  -ipdb {} -omae {}"
-ploprottemp = "{}/utilities/python {}".format(args.schrodinger_path, args.plop_path)
-ploprottemp_command = ploprottemp + " {} -mae_charges=no -mtor=5 -g=30 -clean=yes"
-mutations_program_command = "python " + args.mutations_program_path + \
-                            " -ipdb {} -make_unique Z -gaps_ter "
-# Commands BSC
-# schrodinger_converter = "{}/utilities/pdbconvert ".format(args.schrodinger_path)
-# schrodinger_mae2pdb_convert_command = schrodinger_converter + " -imae {} -opdb {}"
-# schrodinger_pdb2mae_convert_command = schrodinger_converter + " -ipdb {} -omae {}"
+# schrodinger_mae2pdb_convert_command = "pdbconvert -imae {} -opdb {}"
+# schrodinger_pdb2mae_convert_command = "pdbconvert  -ipdb {} -omae {}"
 # ploprottemp = "{}/utilities/python {}".format(args.schrodinger_path, args.plop_path)
-# ploprottemp_command = ploprottemp + "{} -mae_charges=no -mtor=5 -g=30 -clean=yes"
+# ploprottemp_command = ploprottemp + " {} -mae_charges=no -mtor=5 -g=30 -clean=yes"
 # mutations_program_command = "python " + args.mutations_program_path + \
 #                             " -ipdb {} -make_unique Z -gaps_ter "
+# Commands BSC
+schrodinger_converter = "{}/utilities/pdbconvert ".format(args.schrodinger_path)
+schrodinger_mae2pdb_convert_command = schrodinger_converter + " -imae {} -opdb {}"
+schrodinger_pdb2mae_convert_command = schrodinger_converter + " -ipdb {} -omae {}"
+ploprottemp = "{}/utilities/python {}".format(args.schrodinger_path, args.plop_path)
+ploprottemp_command = ploprottemp + "{} -mae_charges=no -mtor=5 -g=30 -clean=yes"
+mutations_program_command = "python " + args.mutations_program_path + \
+                            " -ipdb {} -make_unique Z -gaps_ter "
 
 obc_param_generator = "python {}".format(args.obc_param_generator)
 obc_param_command = obc_param_generator + " {}"
 
-command_fist_execution = {"ploprottemp": True, 'mae2pdb_convert': True, 'pdb2mae_convert': True,
+command_first_execution = {"ploprottemp": True, 'mae2pdb_convert': True, 'pdb2mae_convert': True,
                           'mutations_program': True, 'obc_param_gen': True}
 
 # Set up a counter for non-critical errors and warnings to do a simple summary in the log file.
@@ -384,6 +416,7 @@ else:
 input_files = []
 number_of_skipped_files = 0
 heading = "The following files don't have the right extension (the program will skip them):"
+# This loop iterates over the filenames and discards those that don't have the right extension.
 for filename in args.input_files:
     format_ok = findall(accepted_formats, filename)
     if not format_ok or len(format_ok) > 1:
@@ -406,7 +439,7 @@ else:
     logging.shutdown()
     sys.exit("ERROR: No valid input file.\nTerminating the program.")
 
-# Check the template to look for the parameters to generate.
+# Check the configuration file template to look for the parameters to generate.
 if search("none", args.conf_template, IGNORECASE) is None:
     with open(args.conf_template, 'r') as template_file:
         logging.info(" - Creating the Templates.")
@@ -422,13 +455,14 @@ if search("none", args.conf_template, IGNORECASE) is None:
         solvent_type = solvent_type.lower()
     generate_template = True
 else:
-    logging.info("The program won't generate any configuration file.")
+    logging.info("The program won't generate any configuration file. Because no template has been given.")
     print "No configuration file will be generated."
     solvent_type = ""
     generate_template = False
     keywords_in_the_template = {}
     template_text = ""
 
+# This variable will store the name of the configuration files created.
 configuration_files_names = []
 
 # This huge for loop takes care of all the preparation for each system. From creating the folders
@@ -436,73 +470,37 @@ configuration_files_names = []
 for filename in input_files:
     logging.info("Working with file: {}".format(filename))
     minimum_filename = filename.split(os.sep)[-1]
-    new_folder_name = ".".join(minimum_filename.split(".")[:-1])
+    new_folder_name = ".".join(minimum_filename.split(".")[:-1]) # With this the extension of the file is
+    # removed while keeping all posible . in the name.
     new_general_subfolder = subfolders_path + new_folder_name + os.sep
     exists_already = False
     # The next step is to create a folder for each file, these subfolders will be generated in the
     # directory specified by the option subfolder_path and copy the file.
     logging.info(" - Creating the folder {}".format(new_general_subfolder))
-    # These long try: error blocks are to enable the program to finish if the folders already exist. In which
+    # These long try-error blocks are to enable the program to finish if the folders already exist. In which
     # case new ones won't be generated.
-    try:
-        os.mkdir(new_general_subfolder)
-    except OSError:
-        logging.info(
-            "   -WARNING: The folder {} already exists. So it won't be created again.".format(new_general_subfolder))
-        exists_already = True
-    else:
-        logging.info("   - Folder created correctly")
-
+    createfolder(new_general_subfolder)
     # This block also generates all the folders and links needed to launch a PELE simulations
     # in the new folders. If the folders exist from previous runs they'll be kept
     logging.info(" - Creating the subfolder DataLocal and all its subfolders.")
-
     datalocal_folder = new_general_subfolder + "DataLocal" + os.sep
-    try:
-        os.mkdir(datalocal_folder)
-    except OSError:
-        if not exists_already:
-            logging.info(
-                "The folder {} already exists. But the folder {} is being created now.".format(new_general_subfolder,
-                                                                                               datalocal_folder))
+    createfolder(datalocal_folder)
     rotamerlibs_folder = datalocal_folder + "LigandRotamerLibs" + os.sep
-    try:
-        os.mkdir(rotamerlibs_folder)
-    except OSError:
-        if not exists_already:
-            logging.info("The folder {} already exists. So it won't be created again.".format(rotamerlibs_folder))
+    createfolder(rotamerlibs_folder)
     templates_folder = datalocal_folder + "Templates" + os.sep
-    try:
-        os.mkdir(templates_folder)
-    except OSError:
-        logging.info("The folder {} already exists. So it won't be created again.".format(templates_folder))
+    createfolder(templates_folder)
     opls_folder = templates_folder + "OPLS2005" + os.sep
-    try:
-        os.mkdir(opls_folder)
-    except OSError:
-        logging.info("The folder {} already exists. So it won't be created again.".format(opls_folder))
+    createfolder(opls_folder)
     hetero_folder = opls_folder + "HeteroAtoms" + os.sep
-    try:
-        os.mkdir(hetero_folder)
-    except OSError:
-        logging.info("The folder {} already exists. So it won't be created again.".format(hetero_folder))
+    createfolder(hetero_folder)
     output_folder = new_general_subfolder + "output"
-    try:
-        os.mkdir(output_folder)
-    except OSError:
-        logging.info("The folder {} already exists. So it won't be created again.".format(output_folder))
+    createfolder(output_folder)
     pele_data = args.pele_folders + os.sep + "Data"
     link2data = new_general_subfolder + "Data"
-    try:
-        os.symlink(pele_data, link2data)
-    except OSError:
-        logging.info("The link {} already exists. So it won't be created again.".format(link2data))
+    createsymboliclink(pele_data, link2data)
     pele_documents = args.pele_folders + os.sep + "Documents"
     link2documents = new_general_subfolder + "Documents"
-    try:
-        os.symlink(pele_documents, link2documents)
-    except OSError:
-        logging.info("The link {} already exists. So it won't be created again.".format(link2documents))
+    createsymboliclink(pele_documents, link2documents)
     # Links and subfolders created.
 
     # Now the program copies the input file into the newly created folder.
@@ -518,7 +516,7 @@ for filename in input_files:
         #  The input file has .mae format so it should be transformed to .pdb format
         file_in_pdb_format = is_mae_file.group(1) + ".pdb"
         command2call = schrodinger_mae2pdb_convert_command.format(file_copy, file_in_pdb_format)
-        file_copy = file_in_pdb_format
+        file_copy = file_in_pdb_format  # Updating the variable containing the name of the file to work with
         try:
             check_call(command2call.split())
         except CalledProcessError as error_message:
@@ -645,9 +643,9 @@ for filename in input_files:
     # which case we don't need to generate a template.
     if not no_need4template:
         ligand_template_filename = create_template_and_rotamerlib(ligand_filename, hetero_folder, rotamerlibs_folder,
-                                                                  command_fist_execution['ploprottemp'])
+                                                                  command_first_execution['ploprottemp'])
         if ligand_template_filename:
-            command_fist_execution['ploprottemp'] = False
+            command_first_execution['ploprottemp'] = False
         else:
             logging.info(" - The template hasn't been generated for this system. It'll be discotinued")
             errors_counter += 1
