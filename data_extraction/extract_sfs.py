@@ -30,7 +30,7 @@ import csv
 import extract_sf_help
 
 
-def binana_extraction(filename):
+def binana_extraction(filename, ensemble_flag):
     system_id = filename.split('/')[-1]
     filein = open(filename, 'r')
     file_lines = filein.readlines()
@@ -46,7 +46,10 @@ def binana_extraction(filename):
     #                                        "backbone_alpha": 0.0, "backbone_beta": 0.0, "backbone_other": 0.0}
     h_bonds_dictionary = {"receptor": 0, "ligand": 0}
     total_count = 0
-    name_pattern = r"[_{0}]*(\w+_\d+)_.*ligand".format(os.sep)
+    if ensemble_flag:
+        name_pattern = r"[_{0}]*(\w+_\d+)_.*ligand".format(os.sep)
+    else:
+        name_pattern = r"[_{0}]*([a-z0-9]+_\d+)_.*ligand".format(os.sep)
     ligand_file_pattern = r"\s*ligand\s*\|\s+(\w+)\."
     for line in file_lines:
         if line.strip() == "":
@@ -138,7 +141,7 @@ def binana_extraction(filename):
     return system_id, values_to_extract
 
 
-def mmgbsa_extraction(filename):
+def mmgbsa_extraction(filename, ensemble_flag):
     # Old version that also extracts the total energy and the values discarded
     # for the consensus as descriptors.
     # keywords2look4 = ['r_psp_MMGBSA_dG_Bind', 'r_psp_MMGBSA_dG_Bind_Coulomb', 'r_psp_MMGBSA_dG_Bind_Covalent',
@@ -148,7 +151,10 @@ def mmgbsa_extraction(filename):
     keywords2look4 = ['r_psp_MMGBSA_dG_Bind', 'r_psp_MMGBSA_dG_Bind_Coulomb', 'r_psp_MMGBSA_dG_Bind_Covalent',
                       'r_psp_MMGBSA_dG_Bind_Hbond', 'r_psp_MMGBSA_dG_Bind_Lipo', 'r_psp_MMGBSA_dG_Bind_Packing',
                       'r_psp_MMGBSA_dG_Bind_Solv_GB', 'r_psp_MMGBSA_dG_Bind_vdW', 'r_psp_Lig_Strain_Energy']
-    name_pattern = r"[_{0}]*(\w+_\d+)_.*".format(os.sep)
+    if ensemble_flag:
+        name_pattern = r"[_{0}]*(\w+_\d+)_.*".format(os.sep)
+    else:
+        name_pattern = r"[_{0}]*(\w+_\d+)_.*".format(os.sep)
     complete_name = filename.split(os.sep)[-1].split("-out.csv")[0]
     pattern = re.search(name_pattern, complete_name)
     if pattern:
@@ -179,9 +185,10 @@ def mmgbsa_extraction(filename):
     return system_id, {key[6:]: all_descriptors[key] for key in keywords2look4[1:]}, all_descriptors[keywords2look4[0]]
 
 
-def dsx_extraction(filename):
+def dsx_extraction(filename, ensemble_flag):
     """
     A function to extract the DSX value from an output file of this scoring function were only on ligand was treated.
+    :param ensemble_flag:
     :param filename: a string containing the name of the file to parse.
     :return: Two strings on contains the id of the system and the other the scoring function value
     """
@@ -205,7 +212,11 @@ def dsx_extraction(filename):
         # print 'a'
         return False
     name = pattern.group(1)
-    pattern2find_in_name = r"[_{0}]*(\w+_\d+)_.*l{,1}i{,1}g{,1}a{,1}n{,1}d{,1}"  # If there's any problem with the naming just change this patter. But
+    if ensemble_flag:
+        pattern2find_in_name = r"[_{0}]*(\w+_\d+)_.*l{,1}i{,1}g{,1}a{,1}n{,1}d{,1}"
+    else:
+        pattern2find_in_name = r"[_{0}]*([a-z0-9]+_\d+)_\d+.*l{,1}i{,1}g{,1}a{,1}n{,1}d{,1}"
+        # If there's any problem with the naming just change this patter. But
     # it's quite generic for the DSX score, since we use the suffix _ligand for all the process.
     pattern = re.search(pattern2find_in_name, name)
     if pattern is None:
@@ -220,8 +231,11 @@ def dsx_extraction(filename):
     return system_id, score
 
 
-def xscore_extraction(filename, rt_factor):
-    id_pattern = r".* ligand from '[_{0}]*(\w+_\d+).*_ligand.mol2'".format(os.sep)
+def xscore_extraction(filename, rt_factor, ensemble_flag):
+    if ensemble_flag:
+        id_pattern = r".* ligand from '[_{0}]*(\w+_\d+).*_ligand.mol2'".format(os.sep)
+    else:
+        id_pattern = r".* ligand from '[_{0}]*([a-z0-9]+_\d+).*_ligand.mol2'".format(os.sep)
     scores_patterns = r"(H[M,P,S]SCORE) .* = (-*\d.\d*)|(average) .* = (-*\d.\d*)"
     with open(filename, "r") as infile:
         text = infile.read()
@@ -244,9 +258,14 @@ def xscore_extraction(filename, rt_factor):
     return system_id, values
 
 
-def vina_extraction(filename):
+def vina_extraction(filename, ensemble_flag):
     pattern2look4 = r"Affinity:\s*(-\d+\.\d+)"
     system_id = filename.split(os.sep)[-2]
+    if not ensemble_flag:
+        name_pattern = r"([a-z0-9]+_\d+).*"
+        pattern = re.search(name_pattern, system_id, re.IGNORECASE)
+        if pattern:
+            system_id = pattern.group(1)
     with open(filename, 'r') as infile:
         score_txt = infile.read()
     pattern = re.search(pattern2look4, score_txt)
@@ -257,17 +276,29 @@ def vina_extraction(filename):
     return system_id, score
 
 
-def parse_csv_file(filename):
+def parse_csv_file(filename, ensemble_flag):
     """
     A function meant to parse csv files where we only want two columns,
      the first as ID and the second as value.
+    :param ensemble_flag:
     :param filename: the name of the file to open
     :return: a dictionary containing the first column as keys and the second one as values.
     """
     with open(filename) as infile:
         csv_parser = csv.reader(infile, delimiter=",")
         csv_parser.next()  # With this line we get to skip the header
-        dictio2return = {line[0].split(os.sep)[-1]: line[1] for line in csv_parser}
+        dictio2return = {}
+        for line in csv_parser:
+            if ensemble_flag:
+                name_pattern = r"(\w+_\d+).*"
+            else:
+                name_pattern = r"([a-z0-9]+_\d+).*"
+            pattern = re.search(name_pattern, line[0])
+            if pattern:
+                system_id = pattern.group(1)
+            else:
+                system_id = line[0].split(os.sep)[-1]
+            dictio2return[system_id] = line[1].strip()
     return dictio2return
 
 
@@ -453,6 +484,7 @@ parser.add_argument("-conversion_temperature", "-temperature", type=int, default
                     help=extract_sf_help.conversion_temperature)
 parser.add_argument("-conversion_r_value", "-R", default=0.002, help=extract_sf_help.conversion_r_value)
 parser.add_argument("-output_general_name", required=True, help=extract_sf_help.output_general_name)
+parser.add_argument("-ensemble", action="store_true", help=extract_sf_help.ensemble_data)
 parser.add_argument("-log_file", default="sf_extraction_log.txt", help=extract_sf_help.log_file)
 args = parser.parse_args()
 
@@ -501,7 +533,7 @@ if args.binana_files:
             logging.warning("## WARNING: The file {0} doesn't exist. It'll be skipped.".format(filename))
             warnings_counter += 1
         try:
-            pdb_code, binana_dictio = binana_extraction(filename)
+            pdb_code, binana_dictio = binana_extraction(filename, args.ensemble)
         except TypeError:
             continue
         else:
@@ -524,7 +556,7 @@ if args.mmgbsa_files:
             print "## WARNING: The file {0} doesn't exist. It'll be skipped.".format(filename)
             warnings_counter += 1
         try:
-            pdb_code, mmgbsa_values, mmgbsa_score = mmgbsa_extraction(filename)
+            pdb_code, mmgbsa_values, mmgbsa_score = mmgbsa_extraction(filename, args.ensemble)
         except TypeError:
             pass
         else:
@@ -586,7 +618,7 @@ if args.dsx_files:
             continue
         logging.info(" - Working with file {0}".format(filename))
         try:
-            pdb_code, dsx_values = dsx_extraction(filename)
+            pdb_code, dsx_values = dsx_extraction(filename, args.ensemble)
         except TypeError:
             pass
         else:
@@ -602,7 +634,8 @@ if args.xscore_files:
             continue
         logging.info(" - Working with file {0}".format(filename))
         try:
-            pdb_code, xscore_values = xscore_extraction(filename, args.conversion_r_value * args.conversion_temperature)
+            pdb_code, xscore_values = xscore_extraction(filename, args.conversion_r_value * args.conversion_temperature,
+                                                        args.ensemble)
         except TypeError:
             pass
         else:
@@ -617,7 +650,7 @@ if args.vina_files:
             continue
         logging.info(" - Working with file {0}".format(filename))
         try:
-            pdb_code, vina_score = vina_extraction(filename)
+            pdb_code, vina_score = vina_extraction(filename, args.ensemble)
         except TypeError:
             pass
         else:
@@ -641,7 +674,7 @@ if args.pele_file:
     if not os.path.isfile(args.pele_file):
         logging.warning(" # WARNING: The file {0} doesn't exist. It'll be skipped.".format(args.pele_file))
     else:
-        scoring_functions["pele"] = parse_csv_file(args.pele_file)
+        scoring_functions["pele"] = parse_csv_file(args.pele_file, args.ensemble)
 
 if args.glide_ranking_csv_file:
     if not (os.path.isfile(args.glide_ranking_csv_file[0]) or os.path.isfile(args.glide_ranking_csv_file[1])):
