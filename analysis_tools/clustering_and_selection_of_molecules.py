@@ -27,10 +27,13 @@ out_filenames = {}
 for filename in args.sfs_file:
     if re.match(r".*mm[-_]*gbsa[_-]*.*", filename, re.IGNORECASE):
         scoring_function = "mm_gbsa"
-    elif re.match(".*glideSP.*", filename, re.IGNORECASE):
-        scoring_function = "glideSP"
-    elif re.match(".*glideXP.*", filename, re.IGNORECASE):
-        scoring_function = "glideXP"
+    elif re.match(".*glide.*", filename, re.IGNORECASE):
+        if re.match(".*glideSP.*", filename, re.IGNORECASE):
+            scoring_function = "glideSP"
+        elif re.match(".*glideXP.*", filename, re.IGNORECASE):
+            scoring_function = "glideXP"
+        else:
+            scoring_function = "glide"
     elif re.match(".*vina.*", filename, re.IGNORECASE):
         scoring_function = "vina"
     elif re.match(".*Xscore.*", filename, re.IGNORECASE):
@@ -48,10 +51,6 @@ for filename in args.sfs_file:
             scoring_function = raw_input("Which name do you want to use for this file {}?\n".format(filename))
     elif re.match(".*rdock.*", filename, re.IGNORECASE):
         scoring_function = "rdock"
-    elif re.match(".*binana.*", filename, re.IGNORECASE):
-        scoring_function = "binana"
-    elif re.match(".*Torsions.*|.*TORDOF.*", filename, re.IGNORECASE):
-        scoring_function = "torsions"
     elif re.match(".*PELE.*", filename, re.IGNORECASE):
         scoring_function = "PELE"
     else:
@@ -93,18 +92,20 @@ for tag, filename in input_files.iteritems():
             if first_line:
                 first_line =False
                 continue
-            a = re.search(".*_(\d+)_", line[0])
+            a = re.search(".*_(\d+)_*", line[0])
             if a is None:
                 sim_id = line[0].strip()
             else:
                 sim_id = a.group(1)
+            # print sim_id
+            # print sim_id_name_dictio.keys()
             compound_name = sim_id_name_dictio[sim_id]
             output_ids[sim_id] = line[0].strip()
             try:
                 tmp_dict[compound_name]
             except KeyError:
                 tmp_dict[compound_name] = {}
-            tmp_dict[compound_name][sim_id] = float(line[1].strip())
+            tmp_dict[compound_name][line[0]] = float(line[1].strip())
     with open(out_filenames[tag], 'w') as outfile:
         sf_name = "{0}_value".format(tag)
         csv_writer = csv.DictWriter(outfile, fieldnames=["ID", sf_name], delimiter=",")
