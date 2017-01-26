@@ -1,6 +1,0 @@
-To launch glide:
-
-/opt/Schro2016/run xglide.py glideSP_mininplace.in -HOST localhost:6
-
-
-options: localhost is number of proceesors
