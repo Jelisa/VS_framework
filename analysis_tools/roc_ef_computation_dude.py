@@ -10,10 +10,29 @@ import os
 import roc_ef_help
 
 
+def obtain_energies_from_activity_file(ids2pick, activity_dictionary):
+    activities = []
+    for identifier in ids2pick:
+        pattern = re.search(r'\w+_(\d+)_', identifier)
+        if pattern is None:
+            pattern = re.search(r'\w+_(\d+)_*', identifier)
+            if pattern is None:
+                number = identifier
+            else:
+                number = pattern.group(1)
+        else:
+            number = pattern.group(1)
+        activities.append(activity_dictionary[number])
+    return np.asarray(activities)
+
+# np.asarray([simulation_activity_dictio[sim_id] for sim_id in systems_ids1])
+
+
 def select_systems(sims2select, sfs2use, sfs_systems):
-    indexes2pick = [sfs_systems.index(id2use) for id2use in sims2select]
+    indexes2pick = [index for index, sfs_system in enumerate(sfs_systems) if sfs_system in sims2select]
+    sims_present = [sim for sim in sims2select if sim in sfs_systems]
     sfs2return = np.asarray([sfs2use[x] for x in indexes2pick])
-    return sfs2return, sims2select
+    return sfs2return, sims_present
 
 
 def read_scoring_functions_file(filename, keys=None):
@@ -27,7 +46,7 @@ def read_scoring_functions_file(filename, keys=None):
                 lin = line.strip().split(',')[1:]
                 current_id = line.strip().split(',')[0]
                 sfs_array.append([float(x) for x in lin])
-                a = re.search(r"\w+_(\d+)_", current_id)
+                a = re.search(r"(\w+_\d+)_", current_id)
                 if a:
                     ids.append(a.group(1))
                 else:
@@ -52,6 +71,7 @@ def plot_all_sfs(keys, values_matrix, delta_g_values, subfix, ef_thresholds):
     title = "{} {} ".format(args.general_title, "All SFS")
     fig, ax = pl.subplots()
     color = pl.cm.rainbow(np.linspace(0, 1, len(keys)))
+    # TODO: check if the energies matrix is boolean or not.
     if boolean_matrix_check(delta_g_values):
         actives = delta_g_values[delta_g_values.nonzero()].shape[0]
     else:
@@ -193,13 +213,9 @@ with open(args.activities_file) as csvfile:
 ids2select = []
 if args.systems2use:
     with open(args.systems2use) as infile:
-        for line in infile:
-            current_id = line.strip()
-            a = re.search(r"\w+_(\d+)_", current_id)
-            if a:
-                ids2select.append(a.group(1))
-            else:
-                ids2select.append(current_id)
+        csv_parser = csv.DictReader(infile, delimiter=',')
+        ids2select = [line['ID'] for line in csv_parser]
+
 
 # Defines a matrix from the _all_sfs_merged.csv with all the sfs values and a to lists
 # that are used later for the rest of the script as the dictionary with the systems to use
@@ -214,8 +230,7 @@ if ids2select:
 if "Exp_energy" in keys1:
     delta_g_values1 = all_sf_values1[:, keys1.index("Exp_energy")]
 else:
-    delta_g_values1 = np.asarray([simulation_activity_dictio[sim_id] for sim_id in systems_ids1])
-
+    delta_g_values1 = obtain_energies_from_activity_file(systems_ids1, simulation_activity_dictio)
 
 roc_values1, ef_dicitonaries1 = plot_all_sfs(keys1, all_sf_values1, delta_g_values1, "if", args.ef_thresholds)
 
@@ -232,7 +247,7 @@ if args.previous_scoring_functions_file:
     if "Exp_energy" in keys1:
         delta_g_values0 = all_sf_values0[:, keys0.index("Exp_energy")]
     else:
-        delta_g_values0 = np.asarray([simulation_activity_dictio[sim_id] for sim_id in systems_ids0])
+        delta_g_values0 = obtain_energies_from_activity_file(systems_ids0, simulation_activity_dictio)
     roc_values0, ef_dicitonaries0 = plot_all_sfs(keys0, all_sf_values0, delta_g_values0, 'init', args.ef_thresholds)
     write_roc_files(roc_values0, args.output_prefix + "_init")
     write_ef_files(ef_dicitonaries0, args.output_prefix + "_init")
