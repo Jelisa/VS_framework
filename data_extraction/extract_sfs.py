@@ -18,7 +18,7 @@ Jelisa Iglesias 24/11/2016
 mail: jelisa.iglesias@gmail.com
 """
 
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import os
 import logging
 import datetime
@@ -46,7 +46,7 @@ def binana_extraction(filename):
     #                                        "backbone_alpha": 0.0, "backbone_beta": 0.0, "backbone_other": 0.0}
     h_bonds_dictionary = {"receptor": 0, "ligand": 0}
     total_count = 0
-    name_pattern = r"(\w+)_ligand"
+    name_pattern = r"[_{0}]*(\w+_\d+)_.*ligand".format(os.sep)
     ligand_file_pattern = r"\s*ligand\s*\|\s+(\w+)\."
     for line in file_lines:
         if line.strip() == "":
@@ -148,7 +148,13 @@ def mmgbsa_extraction(filename):
     keywords2look4 = ['r_psp_MMGBSA_dG_Bind', 'r_psp_MMGBSA_dG_Bind_Coulomb', 'r_psp_MMGBSA_dG_Bind_Covalent',
                       'r_psp_MMGBSA_dG_Bind_Hbond', 'r_psp_MMGBSA_dG_Bind_Lipo', 'r_psp_MMGBSA_dG_Bind_Packing',
                       'r_psp_MMGBSA_dG_Bind_Solv_GB', 'r_psp_MMGBSA_dG_Bind_vdW', 'r_psp_Lig_Strain_Energy']
-    system_id = filename.split(os.sep)[-1].split("-out.csv")[0]
+    name_pattern = r"[_{0}]*(\w+_\d+)_.*".format(os.sep)
+    complete_name = filename.split(os.sep)[-1].split("-out.csv")[0]
+    pattern = re.search(name_pattern, complete_name)
+    if pattern:
+        system_id = pattern.group(1)
+    else:
+        system_id = complete_name
     all_descriptors = {}
     with open(filename) as infile:
         file_text = infile.readlines()
@@ -162,7 +168,6 @@ def mmgbsa_extraction(filename):
             logging.error(" ERROR: This file has more than two lines, it shouldn't happen...")
             return False
         else:
-            system_id = filename.split('/')[0]
             skip_this_file = [line for line in file_text if len(line.split(",")) <= 1]
             if skip_this_file:
                 logging.error(" ERROR:This file isn't separated with comas, it isn't valid!")
@@ -200,7 +205,7 @@ def dsx_extraction(filename):
         # print 'a'
         return False
     name = pattern.group(1)
-    pattern2find_in_name = r"(\w+)_l{,1}i{,1}g{,1}a{,1}n{,1}d{,1}"  # If there's any problem with the naming just change this patter. But
+    pattern2find_in_name = r"[_{0}]*(\w+_\d+)_.*l{,1}i{,1}g{,1}a{,1}n{,1}d{,1}"  # If there's any problem with the naming just change this patter. But
     # it's quite generic for the DSX score, since we use the suffix _ligand for all the process.
     pattern = re.search(pattern2find_in_name, name)
     if pattern is None:
@@ -216,7 +221,7 @@ def dsx_extraction(filename):
 
 
 def xscore_extraction(filename, rt_factor):
-    id_pattern = r".* ligand from '(\w+)_ligand.mol2'"
+    id_pattern = r".* ligand from '[_{0}]*(\w+_\d+).*_ligand.mol2'".format(os.sep)
     scores_patterns = r"(H[M,P,S]SCORE) .* = (-*\d.\d*)|(average) .* = (-*\d.\d*)"
     with open(filename, "r") as infile:
         text = infile.read()
@@ -250,6 +255,20 @@ def vina_extraction(filename):
         return False
     score = pattern.group(1)
     return system_id, score
+
+
+def parse_csv_file(filename):
+    """
+    A function meant to parse csv files where we only want two columns,
+     the first as ID and the second as value.
+    :param filename: the name of the file to open
+    :return: a dictionary containing the first column as keys and the second one as values.
+    """
+    with open(filename) as infile:
+        csv_parser = csv.reader(infile, delimiter=",")
+        csv_parser.next()  # With this line we get to skip the header
+        dictio2return = {line[0].split(os.sep)[-1]: line[1] for line in csv_parser}
+    return dictio2return
 
 
 def process_values(dictionary2analyze, keyword2dictionary, possible_name):
@@ -340,7 +359,7 @@ def merge_data(data2use, type_of_data, systems2use, energies_dictio, output_name
                         else:
                             # print pattern.group(1), energies_dictio[pattern.group(1)]
                             energy_value = energies_dictio[pattern.group(1)]
-                            #print pattern.group(1), energies_dictio
+                            # print pattern.group(1), energies_dictio
                 else:
                     energy_value = energies_dictio[system]
                 if values2use[0] == ",":
@@ -353,9 +372,15 @@ def merge_data(data2use, type_of_data, systems2use, energies_dictio, output_name
                     else:
                         text = "ID,{0},Exp_energy\n".format(keys2use)
             else:
-                current_values.append("{0},{1}".format(system, values2use))
+                if values2use[0] == ',':
+                    current_values.append("{0}{1}".format(system, values2use))
+                else:
+                    current_values.append("{0},{1}".format(system, values2use))
                 if not text:
-                    text = "ID,{0}\n".format(keys2use)
+                    if keys2use[0] == ",":
+                        text = "ID{0}\n".format(keys2use)
+                    else:
+                        text = "ID,{0}\n".format(keys2use)
         if not text or not current_values:
             logging.error("ERROR: There's no values for the keyword {0}. Just HOW?".format(keyword))
             continue
@@ -408,18 +433,20 @@ def merge_data(data2use, type_of_data, systems2use, energies_dictio, output_name
     return True
 
 
-parser = ArgumentParser()
-parser.add_argument("-dsx_files", default=[], nargs="+", help=extract_sf_help.dsx_files)
-parser.add_argument("-xscore_files", default=[], nargs="+", help=extract_sf_help.xscore_files)
-parser.add_argument("-binana_files", default=[], nargs="+", help=extract_sf_help.binana_files)
-parser.add_argument("-mmgbsa_files", default=[], nargs="+", help=extract_sf_help.mmgbsa_files)
-parser.add_argument("-rf_score_file", default="", help=extract_sf_help.rf_score_file)
-parser.add_argument("-vina_files", default=[], nargs="+", help=extract_sf_help.vina_files)
-parser.add_argument("-glide_file", default="", help=extract_sf_help.glide_file)
-parser.add_argument("-pele_file", default="", help=extract_sf_help.pele_file)
+parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
+parser.add_argument("-dsx_files", default=False, nargs="+", help=extract_sf_help.dsx_files)
+parser.add_argument("-xscore_files", default=False, nargs="+", help=extract_sf_help.xscore_files)
+parser.add_argument("-binana_files", default=False, nargs="+", help=extract_sf_help.binana_files)
+parser.add_argument("-mmgbsa_files", default=False, nargs="+", help=extract_sf_help.mmgbsa_files)
+parser.add_argument("-rf_score_file", default=False, help=extract_sf_help.rf_score_file)
+parser.add_argument("-vina_files", default=False, nargs="+", help=extract_sf_help.vina_files)
+parser.add_argument("-xglide_file", default=False, help=extract_sf_help.xglide_file)
+parser.add_argument("-glide_ranking_csv_file", default=False, nargs=2,
+                    help=extract_sf_help.glide_ranking_csv_file)
+parser.add_argument("-pele_file", default=False, help=extract_sf_help.pele_file)
 parser.add_argument("-mmgbsa_as_sf", action="store_true", help=extract_sf_help.mmgbsa_as_sf)
-parser.add_argument("-rotable_bonds_files", default=[], nargs="+", help=extract_sf_help.rotable_bonds_files)
-parser.add_argument("-energies_file", default=[], help=extract_sf_help.energies_file)
+parser.add_argument("-rotable_bonds_files", default=False, nargs="+", help=extract_sf_help.rotable_bonds_files)
+parser.add_argument("-energies_file", default=False, help=extract_sf_help.energies_file)
 parser.add_argument("-convert", "-convert2deltaG", nargs="+", default=["xscore", "nn_score"],
                     help=extract_sf_help.convert)
 parser.add_argument("-conversion_temperature", "-temperature", type=int, default=300,
@@ -429,8 +456,8 @@ parser.add_argument("-output_general_name", required=True, help=extract_sf_help.
 parser.add_argument("-log_file", default="sf_extraction_log.txt", help=extract_sf_help.log_file)
 args = parser.parse_args()
 
-if not (args.dsx_files or args.xscore_files or args.binana_files or args.mmgbsa_files or
-        args.rf_score_file or args.vina_files or args.glide_file or args.pele_file or args.rotable_bonds_files):
+# with this line I check if any of the scoring functions has been entered.
+if not {key: value for key, value in vars(args).iteritems() if "file" in key and 'log' not in key and value}:
     parser.error("No action requested. At least one of the scoring functions or descriptors should be provided.")
 
 logging.basicConfig(filename="sf_extraction_log.txt", format="%(message)s", level=logging.INFO, filemode="w")
@@ -596,12 +623,12 @@ if args.vina_files:
         else:
             scoring_functions["vina"][pdb_code] = vina_score
 
-if args.glide_file:
+if args.xglide_file:
     logging.info("Extracting glide score")
-    if not os.path.isfile(args.glide_file):
-        logging.warning(" # WARNING: The file {0} doesn't exist. It'll be skipped.".format(args.glide_file))
+    if not os.path.isfile(args.xglide_file):
+        logging.warning(" # WARNING: The file {0} doesn't exist. It'll be skipped.".format(args.xglide_file))
     else:
-        with open(args.glide_file, 'r') as infile:
+        with open(args.xglide_file, 'r') as infile:
             text = infile.read()
         xglide_log_pattern = r"(\w+)\s+\w+\s+\(.*\)\s+\d+\.\d+\s+(-*\d+\.\d+)"
         scoring_functions["glide"] = {x.group(1): x.group(2) for x in re.finditer(xglide_log_pattern, text)}
@@ -612,11 +639,38 @@ if args.glide_file:
 if args.pele_file:
     logging.info("Extracting pele score")
     if not os.path.isfile(args.pele_file):
-        logging.warning(" # WARNING: The file '{0}' doesn't exist. It'll be skipped.".format(args.pele_file))
+        logging.warning(" # WARNING: The file {0} doesn't exist. It'll be skipped.".format(args.pele_file))
     else:
-        with open(args.pele_file) as infile:
-            csv_parser = csv.DictReader(infile, delimiter=",")
-            scoring_functions["pele"] = {line["ID"].split(os.sep)[-1]: line["pele_score"] for line in csv_parser}
+        scoring_functions["pele"] = parse_csv_file(args.pele_file)
+
+if args.glide_ranking_csv_file:
+    if not (os.path.isfile(args.glide_ranking_csv_file[0]) or os.path.isfile(args.glide_ranking_csv_file[1])):
+        print "At least one of the two elements given to the option glide_ranking_csv_file should be a file."
+        logging.ERROR("No file has been provides for this option so this SF won't be extracted.")
+        errors_counter += 1
+    else:
+        if os.path.isfile(args.glide_ranking_csv_file[0]):
+            filename, prefix = args.glide_ranking_csv_file
+        else:
+            prefix, filename = args.glide_ranking_csv_file[1]
+        if prefix[-1] != "_":
+            prefix += "_"
+        glide_ranking = {}
+        with open(filename) as csvfile:
+            reader = csv.DictReader(csvfile, delimiter=",")
+            # for index, line in enumerate(reader, 1):
+            for sim_num, line in enumerate(reader, 1):
+                if not ("Title" in line or "docking score" in line):
+                    logging.ERROR("The file {0} doesn't have either the field Title or the docking score field"
+                                  "which are mandatory, so this SF won't be extracted.")
+                    errors_counter += 1
+                    break
+                else:
+                    sim_id = prefix + str(sim_num)
+                    if "receptor" in line['Title']:
+                        continue
+                    glide_ranking[sim_id] = line['docking score']
+        scoring_functions["glide"] = glide_ranking
 
 logging.info("Finding the systems with all the scoring functions")
 systems_with_all_sfs_descriptors = set()
@@ -685,17 +739,17 @@ for keyword, dictionary in sorted(descriptors.iteritems()):
                 if not header:
                     header = "ID{0},Exp_energy\n".format(keys2use)
         else:
-
             if values2use[-1] == ",":
                 current_values.append("{0},{1}".format(system, values2use[:-1]))
             elif values2use[0] == ",":
                 current_values.append("{0}{1}".format(system, values2use))
             else:
                 current_values.append("{0},{1}".format(system, values2use))
-            # current_values = ["{0},{1}".format(system, ",".join(map(str, dictio.values())))
-            #                   for system, dictio in dictionary.iteritems()]
+                # current_values = ["{0},{1}".format(system, ",".join(map(str, dictio.values())))
+                #                   for system, dictio in dictionary.iteritems()]
         if not header:
-            header = "{0},{1}\n".format("ID", keys2use)
+            # print 'c', keys2use
+            header = "{0}{1}\n".format("ID", keys2use)
     text = header + "\n".join(current_values)
     if keyword == "structural":
         output_filename = args.output_general_name + "_structural_descriptors_all_systems.csv"
@@ -755,6 +809,8 @@ for keyword, dictionary in sorted(scoring_functions.iteritems()):
         else:
             if values2use[-1] == ",":
                 current_values.append("{0},{1}".format(system, values2use[:-1]))
+            elif values2use[0] == ",":
+                current_values.append("{0}{1}".format(system, values2use))
             else:
                 current_values.append("{0},{1}".format(system, values2use))
     if energy_dictionary:
