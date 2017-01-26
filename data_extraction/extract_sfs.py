@@ -664,9 +664,9 @@ if args.xglide_file:
         with open(args.xglide_file, 'r') as infile:
             text = infile.read()
         if args.ensemble:
-            xglide_log_pattern = r"(\w+_d+)\s+\w+\s+\(.*\)\s+\d+\.\d+\s+(-*\d+\.\d+)"
+            xglide_log_pattern = r"(\w+_\d+).*\s+\w+\s+\(.*\)\s+\d+\.\d+\s+(-*\d+\.\d+)"
         else:
-            xglide_log_pattern = r"([a-z0-9]+_d+)\s+\w+\s+\(.*\)\s+\d+\.\d+\s+(-*\d+\.\d+)"
+            xglide_log_pattern = r"([a-z0-9]+_\d+).*\s+\w+\s+\(.*\)\s+\d+\.\d+\s+(-*\d+\.\d+)"
         scoring_functions["glide"] = {x.group(1): x.group(2) for x in re.finditer(xglide_log_pattern, text)}
         if not scoring_functions["glide"]:
             logging.error(" # ERROR: Couldn't find any line with the pattern used in this script to extract "
