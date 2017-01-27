@@ -68,7 +68,7 @@ def plot_all_sfs(keys, values_matrix, delta_g_values, subfix, ef_thresholds):
     roc_values = {}
     ef_dictionary = {}
     # Plot the image with all the SFs.
-    title = "{} {} ".format(args.general_title, "All SFS")
+    title = "{0} {1} {2}".format(args.general_title, "All SFS", subfix)
     fig, ax = pl.subplots()
     color = pl.cm.rainbow(np.linspace(0, 1, len(keys)))
     # TODO: check if the energies matrix is boolean or not.
@@ -185,6 +185,7 @@ fig_size = pl.rcParams["figure.figsize"]
 print "Current size:", fig_size
 
 # Set figure width to 12 and height to 9
+
 fig_size[0] = 13
 fig_size[1] = 10
 pl.rcParams["figure.figsize"] = fig_size
@@ -241,7 +242,7 @@ write_ef_files(ef_dicitonaries1, args.output_prefix + "_if")
 # print len(keys1), all_sf_values1.shape
 if args.previous_scoring_functions_file:
     print "Working with the file: {0}".format(args.all_sfs_file)
-    keys0, all_sf_values0, systems_ids0 = read_scoring_functions_file(args.all_sfs_file)
+    keys0, all_sf_values0, systems_ids0 = read_scoring_functions_file(args.previous_scoring_functions_file)
     if ids2select:
         all_sf_values0, systems_ids0 = select_systems(ids2select, all_sf_values0, systems_ids1)
     if "Exp_energy" in keys1:
@@ -253,15 +254,15 @@ if args.previous_scoring_functions_file:
     write_ef_files(ef_dicitonaries0, args.output_prefix + "_init")
     common_scores = set.intersection(set(keys1), set(keys0))
     for score in common_scores:
-        title = "{0} (SF:{1}) ".format(args.general_title, score)
+        title = "{0}  (SF:{1} comparisson) ".format(args.general_title, score)
         fig_tmp, ax_tmp = pl.subplots()
         print score,
         # print roc_values0
         fpr0, tpr0, auc_val0 = roc_values0[score]
         fpr1, tpr1, auc_val1 = roc_values1[score]
-        ax_tmp.plot(fpr0, tpr0, label='initial {0} ROC curve (area = {1:0.2f})'.format(score, auc_val0), c='b')
-        ax_tmp.plot(fpr1, tpr1, label='i.f. {0} ROC curve (area = {1:0.2f})'.format(score, auc_val1), c='r')
-        print "delta auc: {0:6.4}".format(auc_val0 - auc_val1)
+        ax_tmp.plot(fpr0, tpr0, label='initial {0} ROC curve (area = {1:0.2f})'.format(score, auc_val0), c='r')
+        ax_tmp.plot(fpr1, tpr1, label='i.f. {0} ROC curve (area = {1:0.2f})'.format(score, auc_val1), c='b')
+        print "delta auc: {0:6.4}".format(auc_val1 - auc_val0)
         ax_tmp.plot([0, 1], [0, 1], color='navy', linestyle='--', label="Random selection")
         ax_tmp.legend(loc="lower right")
         ax_tmp.set_ylim([0, 1])
