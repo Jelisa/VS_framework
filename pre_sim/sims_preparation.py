@@ -58,6 +58,8 @@ def createsymboliclink(original, link):
             logging.info("The link {} already exists. So it won't be created again.".format(link2data))
         else:
             logging.error("The link {} couldn't be created.".format(link2data))
+    else:
+        logging.info("   - Link created correctly")
 
 
 def create_template_and_rotamerlib(initial_pdb, template_folder, rotamer_library_folder, out):
@@ -333,7 +335,7 @@ schrodinger_converter = "{}/utilities/pdbconvert ".format(args.schrodinger_path)
 schrodinger_mae2pdb_convert_command = schrodinger_converter + " -imae {} -opdb {}"
 schrodinger_pdb2mae_convert_command = schrodinger_converter + " -ipdb {} -omae {}"
 ploprottemp = "{}/utilities/python {}".format(args.schrodinger_path, args.plop_path)
-ploprottemp_command = ploprottemp + "{} -mae_charges=no -mtor=5 -g=30 -clean=yes"
+ploprottemp_command = ploprottemp + " {} -mae_charges=no -mtor=5 -g=30 -clean=yes"
 mutations_program_command = "python " + args.mutations_program_path + \
                             " -ipdb {} -make_unique Z -gaps_ter "
 
@@ -431,7 +433,7 @@ for filename in args.input_files:
 if input_files:
     if number_of_skipped_files == 0:
         logging.info("All the input files have the right format.")
-    logging.info("The input files are {}".format("\n".join([filename for filename in input_files])))
+    logging.info("The input files are:\n{}".format("\n".join([filename for filename in input_files])))
 else:
     logging.critical("\nERROR: None of the files specified in the input has the right format."
                      "\nTerminating the program.")
@@ -445,14 +447,14 @@ if search("none", args.conf_template, IGNORECASE) is None:
         logging.info(" - Creating the Templates.")
         template_text = "".join(template_file.readlines())
         keywords_in_the_template = set(pattern.group(1) for pattern in finditer("\$\{*(\w*_*w*)\}?", template_text))
-        solvent_type = search(r'"solventType" : "(.*)",', template_text).group(1)
+        solvent_type = search(r'"solventType" : "(.*)",', template_text)
     if solvent_type is None:
         logging.critical("ERROR: The template doesn't specify the solvent type PELE won't work.")
         logging.info("Terminating the program")
         logging.shutdown()
         sys.exit("Terminating the program.\nThe configuration file doesn't specify the solvent type.")
     else:
-        solvent_type = solvent_type.lower()
+        solvent_type = solvent_type.group(1).lower()
     generate_template = True
 else:
     logging.info("The program won't generate any configuration file. Because no template has been given.")
@@ -493,7 +495,7 @@ for filename in input_files:
     createfolder(opls_folder)
     hetero_folder = opls_folder + "HeteroAtoms" + os.sep
     createfolder(hetero_folder)
-    output_folder = new_general_subfolder + "output"
+    output_folder = new_general_subfolder + "output_{0}".format(solvent_type)
     createfolder(output_folder)
     pele_data = args.pele_folders + os.sep + "Data"
     link2data = new_general_subfolder + "Data"
@@ -664,7 +666,7 @@ for filename in input_files:
                 if search(r"exists", e[1]):
                     pass
                 else:
-                    print "SHIT.", e
+                    print "There's been a problem creating the OBC folder, review it.", e
             copy_obc_param = copy_obc_folder + "solventParamsHCTOBC.txt"
             copyfile(original_obc_param, copy_obc_param)
             command2call = obc_param_command.format(ligand_template_filename)
