@@ -153,7 +153,7 @@ for folder in args.input:
     system_name = pattern.group(1)
     if system_name[-1] != '_' and system_name[-1] != "-":
         system_name += "_"
-    current_output_folder = output_folder + folder_name[:-1]
+    current_output_folder = output_folder + folder_name
     general_output_name = current_output_folder + system_name
     binding_energy_text = []
     for index in models_2_use:
