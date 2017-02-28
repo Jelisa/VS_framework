@@ -38,3 +38,7 @@ mutations_program_path_desc = "The complete path to the mutations program script
 obc_param_generator_desc = "The complete path to the solventOBCParamsGenerator script to generate the OBC parameters" \
                            "for the ligand for PELE.\nDEFAULT: " \
                            "/home/kqtw353/stay/work/OBCparamsgen/solventOBCParamsGenerator.py"
+ligand_chain_desc = "The chain where the ligand is present. This chain should contain only the ligand and unless it " \
+                    "is a peptidic ligand it should be formed by one single residue."
+no_templates = "This option acts as a flag when present the program won't generate the template nor the ligand rotamer " \
+               "library."

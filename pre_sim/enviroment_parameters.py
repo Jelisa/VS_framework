@@ -7,5 +7,5 @@ default_every = 1
 constraints_strength = 0.2
 atoms2apply_constraints_default = [" CA "]
 mutations_program_path = "/home/kqtw353/stay/work/mutations_program/mutations_program.py"
-obc_param_generator_path = "/home/kqtw353/stay/work/OBCparamsgen/solventOBCParamsGenerator.py"ligand_chain = "Z"
+obc_param_generator_path = "/home/kqtw353/stay/work/OBCparamsgen/solventOBCParamsGenerator.py"
 ligand_chain = "Z"
