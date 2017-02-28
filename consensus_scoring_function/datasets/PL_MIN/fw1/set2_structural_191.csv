@@ -1,4 +1,4 @@
-ID,2.5_contacts,4.0_contacts,H_B_ligand,H_B_receptor,backbone_alpha,backbone_beta,backbone_other,hydrophobic,pi-cation,pi-pi,pi-t,rotable_bonds,salt_bridge,sidechain_alpha,sidechain_beta,sidechain_other,Exp_energy
+PDB,2.5_contacts,4.0_contacts,H_B_ligand,H_B_receptor,backbone_alpha,backbone_beta,backbone_other,hydrophobic,pi-cation,pi-pi,pi-t,rotable_bonds,salt_bridge,sidechain_alpha,sidechain_beta,sidechain_other,Experimental
 1ajp,7,84,0,4,0,16,0,21,0,1,0,2,0,4,40,31,-3.08
 1ajq,6,68,0,4,0,16,0,16,0,0,0,2,0,3,33,22,-5.95
 2g5u,2,37,0,1,0,10,0,9,0,0,0,3,0,0,29,0,-11.73
