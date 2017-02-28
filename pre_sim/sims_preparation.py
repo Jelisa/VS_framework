@@ -38,9 +38,9 @@ def createfolder(folder2create_name):
         os.mkdir(folder2create_name)
     except OSError as e:
         if e[1] == "File exists":
-            logging.info("The folder {0} already exists. So it won't be created again.".format(folder2create_name))
+            logging.info(" - The folder {0} already exists. So it won't be created again.".format(folder2create_name))
         else:
-            logging.error("The folder {0} couldn't be created.".format(folder2create_name))
+            logging.error(" - The folder {0} couldn't be created.".format(folder2create_name))
     else:
         logging.info("   - Folder created correctly")
 
@@ -56,9 +56,9 @@ def createsymboliclink(original, link):
         os.symlink(original, link)
     except OSError as e:
         if e[1] == "File exists":
-            logging.info("The link {} already exists. So it won't be created again.".format(link2data))
+            logging.info(" - The link {} already exists. So it won't be created again.".format(link2data))
         else:
-            logging.error("The link {} couldn't be created.".format(link2data))
+            logging.error(" - The link {} couldn't be created.".format(link2data))
     else:
         logging.info("   - Link created correctly")
 
@@ -232,11 +232,53 @@ def obtain_constraints_from_pdb(pdb_filename, every, constraint, atoms2restrain)
                 else:
                     continue
     if not constraints_text:
-        print "The constraints haven't been created fo file {}".format(pdb_filename)
+        print "The constraints haven't been created for file {}".format(pdb_filename)
         return False
     else:
         constraints_text += '\n'
         return constraints_text
+
+
+def obtain_current_values(template_keywords, complex_complete_path, warnings, errors):
+    keywords_values = {}
+    for keyword in template_keywords:
+        if search(".*constraints", keyword, IGNORECASE):
+            if args.debug:
+                print "file4pele: ", complex_complete_path
+            constraints = obtain_constraints_from_pdb(complex_complete_path, args.every, args.constraint,
+                                                      args.atoms2conStraint)
+            if not constraints:
+                print "Couldn't generate the constraints for file {}".format(complex_complete_path)
+                logging.error("  ERROR: Couldn't generate the constraints for file {}".format(complex_complete_path))
+                logging.info(" This system will be discontinued since constraints couldn't be generated.")
+                errors += 1
+                return False, warnings, errors
+            # obtain constraints from a pdb file
+            keywords_values[keyword] = constraints
+        elif search("center_*of_*mass", keyword, IGNORECASE):
+            mass_center = compute_center_of_mass(ligand_filename)
+            if not mass_center:
+                logging.warning("  WARNING: This system will be discontinued. Couldn't compute the center of mass.")
+                logging.info("INFO: to solve this problem talk with he developer and provide the ligand file.")
+                warnings += 1
+                return False, warnings, errors
+            keywords_values[keyword] = mass_center
+        elif search("input.*", keyword, IGNORECASE):
+            keywords_values[keyword] = complex_complete_path.split('/')[-1]
+        elif search("license.*", keyword, IGNORECASE):
+            keywords_values[keyword] = args.pele_license
+        elif search("system.*", keyword, IGNORECASE):
+            keywords_values[keyword] = new_folder_name
+        else:
+            print "The keyword '{}' isn't a valid one".format(keyword)
+            logging.warning("  WARNING: This system will be discontinued. The keyword {} isn't a valid one".format(
+                keyword))
+            logging.info("INFO: Check your keyword if it should be valid talk with he developer and provide "
+                         "the template file.")
+            warnings += 1
+            return False, warnings, errors
+            # Every time a new keyword appears a new search should be added.
+    return keywords_values, warnings, errors
 
 
 def check_ligand(lig_filename):
@@ -303,7 +345,7 @@ def check_mutations_program_output(command, filename, errors_counter):
     return file2use
 
 
-parser = ArgumentParser()
+parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
 parser.add_argument("-input_files", "-input", required=True, nargs="+", help=help_descriptions.input_files_desc)
 parser.add_argument("-receptor", default="", help=help_descriptions.receptor_desc)
 parser.add_argument("-subfolders_path", default=".", help=help_descriptions.subfolder_path_desc)
@@ -596,8 +638,13 @@ for filename in input_files:
     if args.no_templates:
         no_need4template = True
         complex_filename = glob(new_general_subfolder + "*_processed.pdb")[0]
-        file4pele = complex_filename
-        ligand_template_filename = glob(hetero_folder + "???z")[0]
+        existing_templates = glob(hetero_folder + "???z")
+        if existing_templates:
+            ligand_template_filename = existing_templates[0]
+        else:
+            logging.warning("WARNING: There are no pre-existing templates for this system so it will be discontinues.")
+            warnings_counter += 1
+            continue
         ligand_filename = file_copy
     else:
         if form_complexes:
@@ -671,12 +718,12 @@ for filename in input_files:
                 error_file.write(file_preparation_output)
             complex_filename = complex_filename.split('/')[-1]
             logging.info(" - The original complex will be used: {}".format(complex_filename))
+            continue
         else:
-            file4pele = complex_filename.split('.pdb')[0] + "_processed.pdb"
-            logging.info(" - The file ready for pele it's called: {}".format(file4pele))
+            complex_filename = complex_filename.split('.pdb')[0] + "_processed.pdb"
+            logging.info(" - The file ready for pele it's called: {}".format(complex_filename))
             # The configuration file and this file will be in the same folder thus we just need the name of
             # the complex and not the whole path.
-            complex_filename = file4pele.split('/')[-1]
         if ".pdb" not in ligand_filename:
             print "ligand_filename:", ligand_filename
             logging.critical("There's a problem in the code, tell the developer code L354")
@@ -740,48 +787,15 @@ for filename in input_files:
                 continue
     # This block creates the configuration file into the folder.
     if generate_configuration_file_template:
-        keywords_values = {}
-        for keyword in keywords_in_the_template:
-            if search(".*constraints", keyword, IGNORECASE):
-                if args.debug:
-                    print "file4pele: ", file4pele
-                constraints = obtain_constraints_from_pdb(file4pele, args.every, args.constraint,
-                                                          args.atoms2conStraint)
-                if not constraints:
-                    print "Couldn't generate the constraints for file {}".format(complex_filename)
-                    logging.error("  ERROR: Couldn't generate the constraints for file {}".format(complex_filename))
-                    logging.info(" This system will be discontinued since constraints couldn't be generated.")
-                    errors_counter += 1
-                    continue
-                # obtain constraints from a pdb file
-                keywords_values[keyword] = constraints
-            elif search("center_*of_*mass", keyword, IGNORECASE):
-                mass_center = compute_center_of_mass(ligand_filename)
-                if not mass_center:
-                    logging.warning("  WARNING: This system will be discontinued. Couldn't compute the center of mass.")
-                    logging.info("INFO: to solve this problem talk with he developer and provide the ligand file.")
-                    warnings_counter += 1
-                    continue
-                keywords_values[keyword] = mass_center
-            elif search("input.*", keyword, IGNORECASE):
-                keywords_values[keyword] = complex_filename
-            elif search("license.*", keyword, IGNORECASE):
-                keywords_values[keyword] = args.pele_license
-            elif search("system.*", keyword, IGNORECASE):
-                keywords_values[keyword] = new_folder_name
-            else:
-                print "The keyword '{}' isn't a valid one".format(keyword)
-                logging.warning("  WARNING: This system will be discontinued. The keyword {} isn't a valid one".format(
-                    keyword))
-                logging.info("INFO: Check your keyword if it should be valid talk with he developer and provide "
-                             "the template file.")
-                warnings_counter += 1
-                continue
-                # Every time a new keyword appears a new search should be added.
+        keywords_values, warnings_counter, errors_counter = obtain_current_values(keywords_in_the_template,
+                                                                                  complex_filename,
+                                                                                  warnings_counter, errors_counter)
+        if not keywords_values:
+            continue
         template = Template(template_text)
         try:
             new_conf_file_text = template.substitute(keywords_values)
-        except ValueError as e:
+        except (KeyError, ValueError) as e:
             logging.critical("ERROR: the configuration file template isn't able to obtain all the needed values.")
             logging.critical("The program has been terminated.")
             logging.shutdown()
@@ -803,6 +817,7 @@ for filename in input_files:
 # with open(args.sub_template, 'r') as sub_template_file:
 #     sub_template_text = "".join(sub_template_file.readlines())
 
+print "Finished Correctly."
 logging.info("{} : Program finished normally with {} warnings and {} non-critical errors.".format(
     datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), warnings_counter, errors_counter))
 logging.shutdown()
