@@ -6,6 +6,7 @@ rf_score_file = "This option specifies the files to use for the extraction of th
 vina_files = "This option specifies the files to use for the extraction of the vina values."
 xglide_file = "This option specifies the log file from xglide to use for the extraction of glide values."
 energies_file = "This option specifies the file containing the experimental energies for all the systems."
+obabel_desc = "This option computes the descriptors: logP, MW, TPSA, using pybel, from the ligand pdb files."
 convert = "This option establishes the scoring functions to convert to energy value from pkd. "
 conversion_temperature = "The temperature value to use when converting from pkd to energy."
 conversion_r_value = "The r value to use when converting from pkd to energy."
@@ -21,5 +22,5 @@ glide_ranking_csv_file = "This option expects two terms. One is a .csv file gene
                          "as the order used when extracting the compounds to launch the simulations. " \
                          "The other term is going to be used as the prefix for the simulations id, so it should " \
                          "correspond with the prefix used as base name when exporting the structures from Maestro."
-ensemble_data = "A flag to select use as id for the systems the pattern 'word_number_number', otherwise the pattern " \
-                "used will be 'word_number'."
+ensemble_data = "A flag to select use as the id for the systems the pattern 'word_number_number', otherwise the " \
+                "pattern used will be 'word_number'."

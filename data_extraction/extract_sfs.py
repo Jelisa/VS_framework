@@ -26,6 +26,7 @@ import re
 from math import log
 import sys
 import csv
+import pybel as py
 
 import extract_sf_help
 
@@ -563,6 +564,38 @@ if args.mmgbsa_files:
             descriptors["mmgbsa"][pdb_code] = mmgbsa_values
             if args.mmgbsa_as_sf:
                 scoring_functions["mmgbsa"][pdb_code] = mmgbsa_score
+
+if args.obabel_desc:
+    logging.info("Computing the pybel descriptors.")
+    desired_descriptors = ["MW", "TPSA", "logP"]
+    try:
+        descriptors["structural"]
+    except KeyError:
+        descriptors["structural"] = {}
+    for filename in args.obabel_desc:
+        if '.pdb' not in filename:
+            logging.warning("WARNING: The file {0} doesn't have the right extension."
+                            " It'll be skipped.".format(filename))
+        ligand_molecule = py.readfile('pdb', filename).next()
+        ligand_descriptors = ligand_molecule.calcdesc()
+        if args.ensemble:
+            name_pattern = r"[_{0}]*(\w+_\d+)_.*ligand".format(os.sep)
+        else:
+            name_pattern = r"[_{0}]*([a-z0-9]+_\d+)_.*ligand".format(os.sep)
+        pattern = re.search(name_pattern, filename, re.IGNORECASE)
+        if pattern is None:
+            logging.warning(" # WARNING: The file {0} doesn't match the naming convention.".format(filename))
+            continue
+        else:
+            pdb_code = pattern.group(1)
+        for name in desired_descriptors:
+            try:
+                descriptors["structural"][pdb_code]
+            except:
+                pass
+            else:
+                descriptors["structural"][pdb_code][name] = ligand_descriptors[name]
+
 
 if args.rotable_bonds_files:
     try:
