@@ -479,6 +479,7 @@ parser.add_argument("-pele_file", default=False, help=extract_sf_help.pele_file)
 parser.add_argument("-mmgbsa_as_sf", action="store_true", help=extract_sf_help.mmgbsa_as_sf)
 parser.add_argument("-rotable_bonds_files", default=False, nargs="+", help=extract_sf_help.rotable_bonds_files)
 parser.add_argument("-energies_file", default=False, help=extract_sf_help.energies_file)
+parser.add_argument("-obabel_desc", default=False, nargs='+', help=extract_sf_help.obabel_desc)
 parser.add_argument("-convert", "-convert2deltaG", nargs="+", default=["xscore", "nn_score"],
                     help=extract_sf_help.convert)
 parser.add_argument("-conversion_temperature", "-temperature", type=int, default=300,
