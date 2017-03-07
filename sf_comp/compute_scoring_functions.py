@@ -403,7 +403,6 @@ glides2compute = []
 # Parse the scoring functions to compute and check that all of them are supported.
 first_time_execution = {}
 for sf in args.scoring_functions:
-    found = False
     if re.search(r"(?:autodock)*_*-*vina", sf, re.IGNORECASE):
         compute_autodock_vina = True
         first_time_execution['vina'] = True
