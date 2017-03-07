@@ -13,7 +13,7 @@ import fnmatch
 import logging
 import os
 import sys
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from re import search, findall, finditer, IGNORECASE
 from shutil import copyfile, rmtree, move
 from string import Template
@@ -637,7 +637,7 @@ for filename in input_files:
     # a _receptor.pdb file and a _ligand.pdb file extracting the chain Z from the original file.
     if args.no_templates:
         no_need4template = True
-        complex_filename = glob(new_general_subfolder + "*_processed.pdb")[0]
+        complex_filename = glob(new_general_subfolder + "*_complex_processed.pdb")[0]
         existing_templates = glob(hetero_folder + "???z")
         if existing_templates:
             ligand_template_filename = existing_templates[0]
