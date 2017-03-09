@@ -408,6 +408,8 @@ ploprottemp_command = ploprottemp + " {} -mae_charges=no -mtor=5 -g=30 -clean=ye
 mutations_program_command = "python " + args.mutations_program_path + \
                             " -ipdb {} -make_unique Z -gaps_ter "
 
+mutations_program_command_receptor = "python " + args.mutations_program_path + \
+                            " -ipdb {} -gaps_ter "
 obc_param_generator = "python {}".format(args.obc_param_generator)
 obc_param_command = obc_param_generator + " {}"
 
@@ -506,7 +508,7 @@ if args.receptor:
 
     #TODO: clean the original lines for this part!!
     logging.info(" - Calling the 'mutations_program.py' to format the receptor file.")
-    processed_receptor_filename = check_mutations_program_output(mutations_program_command, receptor_copy, errors_counter)
+    processed_receptor_filename = check_mutations_program_output(mutations_program_command_receptor, receptor_copy, errors_counter)
     if not processed_receptor_filename:
         logging.critical("")
         logging.shutdown()
