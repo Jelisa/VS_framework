@@ -216,7 +216,7 @@ def dsx_extraction(filename, ensemble_flag):
     if ensemble_flag:
         pattern2find_in_name = r"[_{0}]*(\w+_\d+)_.*l{,1}i{,1}g{,1}a{,1}n{,1}d{,1}"
     else:
-        pattern2find_in_name = r"[_{0}]*([a-z0-9]+_\d+)_\d+.*l{,1}i{,1}g{,1}a{,1}n{,1}d{,1}"
+        pattern2find_in_name = r"[_{0}]*([a-z0-9]+_\d+)_\d*.*l{,1}i{,1}g{,1}a{,1}n{,1}d{,1}"
         # If there's any problem with the naming just change this patter. But
     # it's quite generic for the DSX score, since we use the suffix _ligand for all the process.
     pattern = re.search(pattern2find_in_name, name)
