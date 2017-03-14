@@ -11,6 +11,8 @@ import csv
 import os
 import sys
 
+import variables_for_actives_recovery
+
 def find_sim_id(line_text):
     """
     Look in the line for the simulation ID
@@ -27,15 +29,35 @@ def find_sim_id(line_text):
             idt = False
     else:
         idt = pattern.group(1)
-    return idt
+    return int(idt)
 
-parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
-parser.add_argument('-actives_file', required=True)
-parser.add_argument("-inactives_file", required=True)
-parser.add_argument("-glide_ranking", required=True)
-parser.add_argument("-simulations_report", required=True)
+
+def write_dictionary(ofile, fieldnames, dictionary):
+    """
+    Write the dictionary information into a .csv file.
+    :param ofile: a file type object to write the values.
+    :param fieldnames: the names of the columns to write.
+    :param dictionary: the dictionary with the information to write.
+    :return: void
+    """
+    csv_writer = csv.DictWriter(ofile, fieldnames=fieldnames)
+    csv_writer.writeheader()
+    ordered_steps = ['initial', 'after glide', 'into pele', 'after pele']
+    for key in ordered_steps:
+        tmp = {'step': key}
+        tmp.update(dictionary[key])
+        csv_writer.writerow(tmp)
+
+
+parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter, description=variables.program_description)
+parser.add_argument('-actives_file', required=True, help=variables.actives_file_help)
+parser.add_argument("-inactives_file", required=True, help=variables.inactives_file_help)
+parser.add_argument("-glide_ranking", required=True, help=variables.glide_ranking_help)
+parser.add_argument("-simulations_report", required=True, help=variables.simulations_report_help)
+parser.add_argument("-output_file", default=variables.output_default_name, help=variables.output_file_help)
 args = parser.parse_args()
 
+print 'processing mol2 files'
 format_actives_file = args.actives_file.split('.')[-1]
 total_actives_variants = [mol.title for mol in py.readfile(format_actives_file, args.actives_file)]
 total_actives_compounds = list(set(total_actives_variants))
@@ -51,17 +73,16 @@ total_percentage_active_compounds = len(total_actives_compounds) / total_compoun
 total_percentage_active_variants = len(total_actives_variants) / total_variants
 
 
+print "processing the file {0}".format(args.glide_ranking)
 sim_name_dictio = {}
 with open(args.glide_ranking) as infile:
     csv_parser = csv.DictReader(infile, delimiter=",")
-    for n, row in enumerate(csv_parser):
-        sim_name_dictio[str(n)] = row['Title']
+    for n, row in enumerate(csv_parser, 1):
+        sim_name_dictio[n] = row['Title']
+after_glide_actives_variants = [comp for comp in sim_name_dictio.values() if comp in total_actives_compounds]
+after_glide_inactives_variants = [comp for comp in sim_name_dictio.values() if comp in total_inactives_compounds]
 
-after_glide_variants = list(sim_name_dictio.values())
-after_glide_actives_variants = [comp for comp in after_glide_variants if comp in total_actives_compounds]
-after_glide_inactives_variants = [comp for comp in after_glide_variants if comp in total_inactives_compounds]
-
-after_glide_percentage_active_variants = len(after_glide_actives_variants) / float(len(after_glide_variants))
+after_glide_percentage_active_variants = len(after_glide_actives_variants) / float(len(sim_name_dictio.values()))
 
 after_glide_compounds = list(set(sim_name_dictio.values()))
 after_glide_actives_compounds = [comp for comp in after_glide_compounds if comp in total_actives_compounds]
@@ -69,38 +90,109 @@ after_glide_inactives_compounds = [comp for comp in after_glide_compounds if com
 
 after_glide_percentage_active_compounds = len(after_glide_actives_compounds) / float(len(after_glide_compounds))
 
-with open(args.simulations_report) as infile:
-    text = infile.read()
-last_sim = re.search(r'(\d+) .* analyzed', text).group(1)
-missing_templates = int(re.search(r'\* (\d+) .* missing_conf_file', text).group(1))
-after_pele_num = re.search(r'\* (\d+) .* correctly', text).group(1)
-
-lines = text.splitlines()
-store_mis_temp = False
-missing_templates_simulations = []
+# lines = text.splitlines()
+store_mis_conf_file = False
+missing_conf_file_simulations = []
 store_failed = False
 pele_failed_simulations = []
-for l in lines[1:]:
-    if 'missing conf file' in l:
-        store_mis_temp = True
-        store_failed = False
-        continue
-    elif 'The following systems have failed due to' in l:
-        store_failed = True
-        store_mis_temp = False
-        continue
-    if store_failed:
-        sim = find_sim_id(l)
-        if not sim:
-            sys.exit("Talk with the developer")
-        pele_failed_simulations.append(sim)
-    elif store_mis_temp:
-        sim = find_sim_id(l)
-        if not sim:
-            sys.exit("Talk with the developer")
-        missing_templates_simulations.append(sim)
+last_sim = 0
+after_pele_simulations_num = 0
+failed_systems = 0
+missing_conf_file = 0
+with open(args.simulations_report) as infile:
+    # text = infile.read()
+# last_sim = re.search(r'(\d+) .* analyzed', text).group(1)
+# missing_conf_file = int(re.search(r'\* (\d+) .* missing_conf_file', text).group(1))
+# after_pele_num = re.search(r'\* (\d+) .* correctly', text).group(1)
+    for l in infile:
+        if "analyzed" in l:
+            last_sim += int(re.search(r'(\d+) .* analyzed', l).group(1))
+        elif "correctly" in l:
+            after_pele_simulations_num += int(re.search(r'\* (\d+) .* correctly', l).group(1))
+        elif l.startswith(' *'):
+            if "have failed" in l or "are incomplete" in l:
+                failed_systems += int(re.search(r"\* (\d+) .*", l).group(1))
+            elif "missing_conf_file" in l:
+                missing_conf_file += int(re.search(r'\* (\d+) .* missing_conf_file', l).group(1))
+        elif 'missing conf file' in l:
+            store_mis_conf_file = True
+            store_failed = False
+            continue
+        elif 'The following systems have failed due to' in l:
+            store_failed = True
+            store_mis_conf_file = False
+            continue
+        if store_failed:
+            sim = find_sim_id(l)
+            if not sim:
+                sys.exit("Talk with the developer")
+            pele_failed_simulations.append(sim_name_dictio[sim])
+        elif store_mis_conf_file:
+            sim = find_sim_id(l)
+            if not sim:
+                sys.exit("Talk with the developer")
+            missing_conf_file_simulations.append(sim_name_dictio[sim])
 # The missing_templates_simulation and the pele_failed_simulations contain the ID of the simulations that have failed,
 # for the first set it means that the template hasn't been generated, for the second is the PELE simulation what
 # couldn't be carried out.
 
-# TODO: finish the script with the numbers
+if len(missing_conf_file_simulations) != missing_conf_file:
+    print "Something is wrong with the program. The number of missing files doesn't agree between the " \
+          "summary and the list."
+if len(pele_failed_simulations) + len(missing_conf_file_simulations) != failed_systems:
+    print "Something is wrong with the program. The number of failing systems doesn't agree between the " \
+          "summary and the list."
+if last_sim - failed_systems != after_pele_simulations_num:
+    print "Something is wrong with the program. The number of missing files doesn't agree between the " \
+          "summary and the list.2"
+
+into_pele_variants = [v for key, v in sim_name_dictio.iteritems() if key <= last_sim and
+                      v not in missing_conf_file_simulations]
+into_pele_active_variants = [v for v in into_pele_variants if v in total_actives_variants]
+into_pele_active_variants_percentage = len(into_pele_active_variants) / float(len(into_pele_variants))
+into_pele_compounds = list(set(into_pele_variants))
+into_pele_active_compounds = [comp for comp in into_pele_compounds if comp in total_actives_compounds]
+into_pele_active_compounds_percentage = len(into_pele_active_compounds) / float(len(into_pele_compounds))
+
+after_pele_variants = [v for v in into_pele_variants if v not in pele_failed_simulations]
+after_pele_active_variants = [v for v in after_pele_variants if v in total_actives_variants]
+after_pele_active_variants_percentage = len(after_pele_active_variants) / float(len(after_pele_variants))
+after_pele_compounds = list(set(after_pele_variants))
+after_pele_active_compounds = [v for v in after_pele_compounds if v in total_actives_compounds]
+after_pele_active_compounds_percentage = len(after_pele_active_compounds) / float(len(after_pele_compounds))
+
+variants_dictio = {}
+variants_dictio['initial'] = {'actives': len(total_actives_variants),
+                              'inactives': len(total_inactives_variants),
+                              'actives %': "{0:6.4f}".format(total_percentage_active_variants)}
+variants_dictio['after glide'] = {'actives': len(after_glide_actives_variants),
+                                  'inactives': len(after_glide_inactives_variants),
+                                  'actives %': "{0:6.4f}".format(after_glide_percentage_active_variants)}
+variants_dictio['into pele'] = {'actives': len(into_pele_active_variants),
+                                'inactives': len(into_pele_variants) - len(into_pele_active_variants),
+                                'actives %': "{0:6.4f}".format(into_pele_active_variants_percentage)}
+variants_dictio['after pele'] = {'actives': len(after_pele_active_variants),
+                                 'inactives': len(after_pele_variants) - len(after_pele_active_variants),
+                                 'actives %': "{0:6.4f}".format(after_pele_active_variants_percentage)}
+
+compounds_dictio = {}
+compounds_dictio['initial'] = {'actives': len(total_actives_compounds),
+                              'inactives': len(total_inactives_compounds),
+                              'actives %': "{0:6.4f}".format(total_percentage_active_compounds)}
+compounds_dictio['after glide'] = {'actives': len(after_glide_actives_compounds),
+                                  'inactives': len(after_glide_inactives_compounds),
+                                  'actives %': "{0:6.4f}".format(after_glide_percentage_active_compounds)}
+compounds_dictio['into pele'] = {'actives': len(into_pele_active_compounds),
+                                'inactives': len(into_pele_compounds) - len(into_pele_active_compounds),
+                                'actives %': "{0:6.4f}".format(into_pele_active_compounds_percentage)}
+compounds_dictio['after pele'] = {'actives': len(after_pele_active_compounds),
+                                 'inactives': len(after_pele_compounds) - len(after_pele_active_compounds),
+                                 'actives %': "{0:6.4f}".format(after_pele_active_compounds_percentage)}
+
+print "writing file: {0}".format(args.output_file)
+with open(args.output_file, 'w') as outfile:
+    outfile.write("Variants information\n")
+    table_columns = ['step', 'actives', 'inactives', 'actives %']
+    write_dictionary(outfile, table_columns, variants_dictio)
+    outfile.write("\nCompounds information\n")
+    write_dictionary(outfile, table_columns, compounds_dictio)
