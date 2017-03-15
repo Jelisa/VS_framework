@@ -30,6 +30,7 @@ from string import Template
 from subprocess import check_output, STDOUT, CalledProcessError, check_call
 import logging
 import datetime
+import pybel as py
 
 import external_software_paths
 import modules  # This is for AZ.
@@ -387,6 +388,9 @@ prepare_receptor_path = "{0}bin/pythonsh {1}prepare_receptor4.py ".format(extern
                                                                           external_software_paths.vina_utilities)
 prepare_ligand_vina_command = prepare_ligand_path + "-l {0} -o {1}"
 prepare_receptor_vina_command = prepare_receptor_path + "-U nphs -U lps -U nonstdres -r {0} -o {1}"
+rf_descriptors_extractor_path = "{0}RF-descriptors_extraction ".format(
+    external_software_paths.rf_score_descriptors_extractior_path)
+rf_descriptors_commands = rf_descriptors_extractor_path + "--input_from_file {0} --output_file {1}"
 
 
 
@@ -399,6 +403,7 @@ compute_dsx = False
 compute_rf_score = False
 compute_mmgbsa = False
 compute_binana = False
+compute_obabel_desc = False
 glides2compute = []
 # Parse the scoring functions to compute and check that all of them are supported.
 first_time_execution = {}
@@ -428,6 +433,8 @@ for sf in args.scoring_functions:
         else:
             glides2compute.append("glide_"+a.group(1).upper())
             first_time_execution["glide_"+a.group(1).upper()] = True
+    elif re.search(r"obabel[_-]*desc(?:riptors)*", sf, re.IGNORECASE):
+        compute_obabel_desc = True
 first_time_execution["obabel"] = True
 first_time_execution["pdbqt"] = True
 first_time_execution["mae"] = True
@@ -494,6 +501,7 @@ if compute_rf_score:
     rf_score_name_deltag_dictio = {}
     if args.experimental_deltag:
         with open(args.experimental_deltag, 'r') as infile:
+            first_line = None
             for line in infile:
                 line = line.strip()
                 if "," in line:
@@ -502,7 +510,16 @@ if compute_rf_score:
                     line = line.split(";")
                 else:
                     line = line.split()
-                deltag_values[line[1].strip()] = line[2].strip()
+                if first_line is not None:
+                    try:
+                        int(line[1])
+                    except ValueError and first_line is not None:
+                        sim_index = line.index("sim_id")
+                        activity_index = line.index("activity")
+                    else:
+                        sim_index = 1
+                        activity_index = 2
+                deltag_values[line[sim_index].strip()] = line[activity_index].strip()
     else:
         logging.info("INFO: Note that no energies file has been given, since RF-Score needs energy values as "
                      "input the program will assign a dummy energy of 0 to all the systems")
@@ -777,12 +794,21 @@ if compute_rf_score:
     else:
         rf_output_folder = args.rf_score_output_file
     rf_output_filename = rf_output_folder + "rf_descriptors_input_file.txt"
-    logging.info("Writing the initial file for RF-Score: {}".format(rf_output_filename))
+    rf_descriptors_output_filename = rf_output_folder + "rf_descriptors_output_file.txt"
+    logging.info("Writing the initial file for RF-Score: {0}".format(rf_output_filename))
     with open(rf_output_filename, 'w') as outfile:
-        outfile.write("\n".join(["{0} {1}".format(key, value) for key, value in
+        outfile.write("\n".join(["{0},{1}".format(key, value) for key, value in
                                  rf_score_name_deltag_dictio.iteritems()]))
-    logging.info("Remember yo have to execute RF yourself!")
-    print "Remember yo have to execute RF yourself!"
+    rf_command = rf_descriptors_commands.format(rf_output_filename, rf_descriptors_output_filename)
+    try:
+        rf_output = check_output(rf_command.split())
+    except CalledProcessError as e:
+        command_execution_failed(rf_command, e)
+    else:
+        if "Filename" not in rf_output:
+            command_execution_failed(rf_command, e)
+    # logging.info("Remember yo have to execute RF yourself!")
+    # print "Remember yo have to execute RF yourself!"
 logging.info("{} : Program finished normally with {} warnings and {} non-critical errors.".format(
     datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), warnings_counter, errors_counter))
 logging.shutdown()
