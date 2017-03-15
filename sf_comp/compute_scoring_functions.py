@@ -389,7 +389,7 @@ prepare_receptor_path = "{0}bin/pythonsh {1}prepare_receptor4.py ".format(extern
 prepare_ligand_vina_command = prepare_ligand_path + "-l {0} -o {1}"
 prepare_receptor_vina_command = prepare_receptor_path + "-U nphs -U lps -U nonstdres -r {0} -o {1}"
 rf_descriptors_extractor_path = "{0}RF-descriptors_extraction ".format(
-    external_software_paths.rf_score_descriptors_extractior_path)
+    external_software_paths.rf_score_descriptors_extractor_path)
 rf_descriptors_commands = rf_descriptors_extractor_path + "--input_from_file {0} --output_file {1}"
 
 
