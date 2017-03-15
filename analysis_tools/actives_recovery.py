@@ -49,12 +49,12 @@ def write_dictionary(ofile, fieldnames, dictionary):
         csv_writer.writerow(tmp)
 
 
-parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter, description=variables.program_description)
-parser.add_argument('-actives_file', required=True, help=variables.actives_file_help)
-parser.add_argument("-inactives_file", required=True, help=variables.inactives_file_help)
-parser.add_argument("-glide_ranking", required=True, help=variables.glide_ranking_help)
-parser.add_argument("-simulations_report", required=True, help=variables.simulations_report_help)
-parser.add_argument("-output_file", default=variables.output_default_name, help=variables.output_file_help)
+parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter, description=variables_for_actives_recovery.program_description)
+parser.add_argument('-actives_file', required=True, help=variables_for_actives_recovery.actives_file_help)
+parser.add_argument("-inactives_file", required=True, help=variables_for_actives_recovery.inactives_file_help)
+parser.add_argument("-glide_ranking", required=True, help=variables_for_actives_recovery.glide_ranking_help)
+parser.add_argument("-simulations_report", required=True, help=variables_for_actives_recovery.simulations_report_help)
+parser.add_argument("-output_file", default=variables_for_actives_recovery.output_default_name, help=variables_for_actives_recovery.output_file_help)
 args = parser.parse_args()
 
 print 'processing mol2 files'
