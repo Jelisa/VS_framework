@@ -33,7 +33,7 @@ import datetime
 import pybel as py
 
 import external_software_paths
-import modules  # This is for AZ.
+# import modules  # This is for AZ.
 
 
 def extract_ligand(pdb_filename, general_name, ligand_chain, executing_folder):
@@ -356,7 +356,7 @@ def mmgbsa_execution(complex_filename, execution_folder, host, number_cpus):
 parser = argparse.ArgumentParser()
 parser.add_argument("-input_files", nargs="+", required=True)
 parser.add_argument("-folders_path", default="./scoring_functions_values")
-parser.add_argument("-output_general_name", default="all")
+#parser.add_argument("-output_general_name", default="all")
 parser.add_argument("-scoring_functions", nargs="+",
                     default=["glide", "vina", "xscore", "dsx", "mmgbsa", "binana", "rf_score"])
 parser.add_argument("-schrodinger_host", default="Calculon_slurm")
@@ -377,10 +377,10 @@ errors_counter = 0
 # Some constants definitions and environmental commands needed to use other applications. They'll
 # change depending on the environment where the program is launched (BSC, AZ, etc.)
 # AZ
-modules.module("load", "schrodinger/2016.01")
+# modules.module("load", "schrodinger/2016.01")
 pdb_convert_path = external_software_paths.schrodinger_path
 schrodinger_pdb2mae_convert_command = pdb_convert_path + "utilities/pdbconvert -ipdb {} -omae {}"
-modules.module("load", "openbabel/python2.7-2.3.1")
+# modules.module("load", "openbabel/python2.7-2.3.1")
 obabel_command = "obabel {} -O {}"
 prepare_ligand_path = "{0}bin/pythonsh {1}prepare_ligand4.py ".format(external_software_paths.vina_tools,
                                                                       external_software_paths.vina_utilities)
