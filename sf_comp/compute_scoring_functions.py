@@ -49,6 +49,7 @@ def extract_ligand(pdb_filename, general_name, ligand_chain, executing_folder):
     receptor_text = ""
     waters_text = ""
     ligand_text = ""
+    ligand_filename = general_name + "_ligand.pdb"
     with open(pdb_filename, 'r') as pdb_file:
         for line in pdb_file:
             if line.startswith("ATOM") or line.startswith("HETATM"):
@@ -68,14 +69,13 @@ def extract_ligand(pdb_filename, general_name, ligand_chain, executing_folder):
         return False
     else:
         logging.info(" - Ligand and receptor extracted correctly.")
-    ligand_filename = general_name + "_ligand.pdb"
     with open(executing_folder + ligand_filename, 'w') as ligand_file:
         ligand_file.write(ligand_text)
     if waters_text:
         waters_filename = general_name + "_waters.pdb"
         with open(executing_folder + waters_filename, 'w') as waters_file:
             waters_file.write(waters_text)
-        receptor_with_waters_filename = general_name + "protein.pdb"
+        receptor_with_waters_filename = general_name + "_protein.pdb"
         with open(executing_folder + receptor_with_waters_filename, 'w') as receptor_with_waters_file:
             receptor_with_waters_file.write(receptor_with_waters_text)
         receptor_no_waters_filename = general_name + "_receptor_no_waters.pdb"
@@ -105,12 +105,12 @@ def structures_conversion_pdb_to_format(initial_filename, output_format, convers
         print "wd:", executing_folder
     general_name = initial_filename.split(".pdb")[0]
     output_name = general_name + output_format
-    if os.path.isfile(output_name):
+    if os.path.isfile(executing_folder + output_name):
         if not rewrite:
-            logging.info(" - The file {0} already exists it won't be rewritten").format(output_name)
+            logging.info(" - The file {0} already exists it won't be rewritten".format(output_name))
             return output_name, warnings_count
         else:
-            logging.info(" - The file {0} already exists it will be rewritten").format(output_name)
+            logging.info(" - The file {0} already exists it will be rewritten".format(output_name))
         logging.info(" - The file already exists")
     command2execute = conversor_command.format(initial_filename, output_name)
     try:
@@ -501,7 +501,7 @@ if compute_rf_score:
     rf_score_name_deltag_dictio = {}
     if args.experimental_deltag:
         with open(args.experimental_deltag, 'r') as infile:
-            first_line = None
+            first_line = True
             for line in infile:
                 line = line.strip()
                 if "," in line:
@@ -510,12 +510,14 @@ if compute_rf_score:
                     line = line.split(";")
                 else:
                     line = line.split()
-                if first_line is not None:
+                if first_line:
+                    first_line = False
                     try:
                         int(line[1])
-                    except ValueError and first_line is not None:
+                    except ValueError:
                         sim_index = line.index("sim_id")
                         activity_index = line.index("activity")
+                        continue
                     else:
                         sim_index = 1
                         activity_index = 2
@@ -807,6 +809,7 @@ if compute_rf_score:
     else:
         if "Filename" not in rf_output:
             command_execution_failed(rf_command, e)
+    os.remove(rf_output_filename)
     # logging.info("Remember yo have to execute RF yourself!")
     # print "Remember yo have to execute RF yourself!"
 logging.info("{} : Program finished normally with {} warnings and {} non-critical errors.".format(
