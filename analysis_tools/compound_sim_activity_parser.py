@@ -6,6 +6,7 @@ parser = ArgumentParser()
 parser.add_argument("-glide_docking_rank", required=True)
 parser.add_argument("-actives_file", required=True)
 parser.add_argument("-inactives_file", default=False)
+parser.add_argument("-system_name", required=True)
 parser.add_argument("-output_file", required=True)
 args = parser.parse_args()
 
@@ -85,7 +86,8 @@ for molecule in unset_molecules:
 
 output_text = ["name,sim_id,activity,exp_val,experiment"]
 for index, molecule in enumerate(molecule_names, 1):
-    output_line = ",".join([molecule, str(index), name_activity_dictio[molecule],
+    sim_id = "{0}_{1}".format(args.system_name, str(index))
+    output_line = ",".join([molecule, sim_id, name_activity_dictio[molecule],
                             name_experiment_value_dictio[molecule], name_experiment_type_dictio[molecule]])
     output_text.append(output_line)
 
