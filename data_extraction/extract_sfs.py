@@ -427,6 +427,8 @@ def merge_data(data2use, type_of_data, systems2use, energies_dictio, output_name
                 output_filename = output_name + "_structural_descriptors_common_systems.csv"
             elif keyword == "mmgbsa":
                 output_filename = output_name + "_energy_descriptors_common_systems.csv"
+            elif keyword == "rf_score":
+                output_filename = output_name + "_rf_descriptors_common_systems.csv"
             else:
                 # print keyword
                 unknowns_counter += 1
@@ -470,9 +472,10 @@ parser.add_argument("-dsx_files", default=False, nargs="+", help=extract_sf_help
 parser.add_argument("-xscore_files", default=False, nargs="+", help=extract_sf_help.xscore_files)
 parser.add_argument("-binana_files", default=False, nargs="+", help=extract_sf_help.binana_files)
 parser.add_argument("-mmgbsa_files", default=False, nargs="+", help=extract_sf_help.mmgbsa_files)
-parser.add_argument("-rf_score_file", default=False, help=extract_sf_help.rf_score_file)
+parser.add_argument("-rf_as_score_file", default=False, help=extract_sf_help.rf_as_score_file)
+parser.add_argument("-rf_descriptors_file", default=False, help=extract_sf_help.rf_descriptors_file)
 parser.add_argument("-vina_files", default=False, nargs="+", help=extract_sf_help.vina_files)
-parser.add_argument("-xglide_file", default=False, help=extract_sf_help.xglide_file)
+parser.add_argument("-xglide_files", default=False, nargs="+", help=extract_sf_help.xglide_file)
 parser.add_argument("-glide_ranking_csv_file", default=False, nargs=2,
                     help=extract_sf_help.glide_ranking_csv_file)
 parser.add_argument("-pele_file", default=False, help=extract_sf_help.pele_file)
@@ -507,23 +510,27 @@ if args.energies_file:
         logging.error("ERROR: The energy file specified doesn't exist.")
     else:
         with open(args.energies_file) as infile:
-            for l in infile:
-                l = l.strip()
-                if not l:
-                    continue
-                if len(l.split(",")) == 1:
-                    l = l.split(";")
+            first_line = True
+            for line in infile:
+                line = line.strip()
+                if "," in line:
+                    line = line.split(",")
+                elif ";" in line:
+                    line = line.split(";")
                 else:
-                    l = l.split(",")
-                if len(l) == 2 or len(l) > 3:
-                    energy_dictionary[l[0]] = l[1]
-                elif len(l) == 3:
-                    energy_dictionary[l[1]] = l[2]
-                else:
-                    logging.error("Check the energies files it should contain at least the id and the energy "
-                                  "in the two first columns and the separator should be  ',' or ';'")
-                    errors_counter += 1
-
+                    line = line.split()
+                if first_line:
+                    first_line = False
+                    try:
+                        int(line[1])
+                    except ValueError:
+                        sim_index = line.index("sim_id")
+                        activity_index = line.index("activity")
+                        continue
+                    else:
+                        sim_index = 1
+                        activity_index = 2
+                energy_dictionary[line[sim_index].strip()] = line[activity_index].strip()
 descriptors = {}
 scoring_functions = {}
 if args.binana_files:
@@ -621,15 +628,15 @@ if args.rotable_bonds_files:
             else:
                 descriptors["structural"][pdb_code]["rotable_bonds"] = pattern.group(1)
 
-if args.rf_score_file:
+if args.rf_as_score_file:
     logging.info("Extracting rf_score values")
     scoring_functions["rf_score"] = {}
-    if not os.path.isfile(args.rf_score_file):
+    if not os.path.isfile(args.rf_as_score_file):
         logging.warning(" # WARNING: The file {0} doesn't exist. It'll be skipped.".format(args.rf_score_file))
     else:
-        with open(args.rf_score_file, 'r') as infile:
+        with open(args.rf_as_score_file, 'r') as infile:
             text = infile.read()
-            rf_values_in_output_pattern = r"\"(\w+)(?:_ligand)\",(-*\d+\.\d+)"
+            rf_values_in_output_pattern = r"\"(\w+)(?:_ligand)*\",(-*\d+\.\d+)"
             first = True
             if "rf_score" in args.convert:
                 scoring_functions["rf_score"] = {pattern.group(1): "{0:0.5f}".format(args.conversion_r_value *
@@ -642,6 +649,33 @@ if args.rf_score_file:
                 scoring_functions["rf_score"] = {pattern.group(1): pattern.group(2)
                                                  for pattern in re.finditer(rf_values_in_output_pattern, text,
                                                                             re.IGNORECASE)}
+
+if args.rf_descriptors_file:
+    logging.info("Extracting rf_score descriptors")
+    descriptors["rf_score"] = {}
+    if not os.path.isfile(args.rf_descriptors_file):
+        logging.warning(" # WARNING: The file {0} doesn't exist. It'll be skipped.".format(args.rf_score_file))
+    else:
+        with open(args.rf_descriptors_file) as infile:
+            csvparser = csv.DictReader(infile, delimiter=",")
+            tmp_pattern = re.search("id", "".join(csvparser.fieldnames), re.IGNORECASE)
+            ids_key = None
+            if tmp_pattern:
+                ids_key = tmp_pattern.group()
+            else:
+                tmp_pattern = re.search("pdb", "".join(csvparser.fieldnames), re.IGNORECASE)
+                if tmp_pattern:
+                    ids_key = tmp_pattern.group()
+                else:
+                    logging.error("ERROR: The file {0} doesn't have the right format".format(args.rf_descriptors_file))
+            if ids_key is not None:
+                for line in csvparser:
+                    values = {k: v for k, v in line.iteritems() if k != ids_key and k != "pbindaff"}
+                    if args.ensemble:
+                        key = re.search(r"([a-z0-9]+_\d+_\d+)", line[ids_key], re.IGNORECASE).group(1)
+                    else:
+                        key = re.search(r"([a-z0-9]+_\d+)_\d+", line[ids_key], re.IGNORECASE).group(1)
+                    descriptors["rf_score"][key] = values
 
 if args.dsx_files:
     logging.info("Extracting DSX score")
@@ -690,21 +724,23 @@ if args.vina_files:
         else:
             scoring_functions["vina"][pdb_code] = vina_score
 
-if args.xglide_file:
+if args.xglide_files:
     logging.info("Extracting glide score")
-    if not os.path.isfile(args.xglide_file):
-        logging.warning(" # WARNING: The file {0} doesn't exist. It'll be skipped.".format(args.xglide_file))
-    else:
-        with open(args.xglide_file, 'r') as infile:
-            text = infile.read()
-        if args.ensemble:
-            xglide_log_pattern = r"(\w+_\d+).*\s+\w+\s+\(.*\)\s+\d+\.\d+\s+(-*\d+\.\d+)"
+    scoring_functions["glide"] = {}
+    for filename in args.xglide_files:
+        if not os.path.isfile(filename):
+            logging.warning(" # WARNING: The file {0} doesn't exist. It'll be skipped.".format(filename))
         else:
-            xglide_log_pattern = r"([a-z0-9]+_\d+).*\s+\w+\s+\(.*\)\s+\d+\.\d+\s+(-*\d+\.\d+)"
-        scoring_functions["glide"] = {x.group(1): x.group(2) for x in re.finditer(xglide_log_pattern, text)}
-        if not scoring_functions["glide"]:
-            logging.error(" # ERROR: Couldn't find any line with the pattern used in this script to extract "
-                          "the scores from the log file of xglide script.")
+            with open(filename, 'r') as infile:
+                text = infile.read()
+            if args.ensemble:
+                xglide_log_pattern = r"(\w+_\d+).*\s+\w+\s+\(.*\)\s+\d+\.\d+\s+(-*\d+\.\d+)"
+            else:
+                xglide_log_pattern = r"([a-z0-9]+_\d+).*\s+\w+\s+\(.*\)\s+\d+\.\d+\s+(-*\d+\.\d+)"
+            scoring_functions["glide"].update({x.group(1): x.group(2) for x in re.finditer(xglide_log_pattern, text)})
+            if not scoring_functions["glide"]:
+                logging.error(" # ERROR: Couldn't find any line with the pattern used in this script to extract "
+                              "the scores from the log file of xglide script.")
 
 if args.pele_file:
     logging.info("Extracting pele score")
@@ -775,7 +811,7 @@ for keyword, dictionary in sorted(descriptors.iteritems()):
         if energy_dictionary:
             # print 'here'
             try:
-                current_values.append("{0},{1},{2}".format(system, values2use, energy_dictionary[system]))
+                energy_dictionary[system]
             except KeyError as e:
                 idx_pattern = r"\w+_(\d+)_"
                 pattern = re.search(idx_pattern, system)
@@ -808,6 +844,12 @@ for keyword, dictionary in sorted(descriptors.iteritems()):
             else:
                 if not header:
                     header = "ID{0},Exp_energy\n".format(keys2use)
+                if values2use[-1] == ",":
+                    current_values.append("{0},{1}{2}".format(system, values2use, energy_dictionary[system]))
+                elif values2use[0] == ",":
+                    current_values.append("{0}{1},{2}".format(system, values2use, energy_dictionary[system]))
+                else:
+                    current_values.append("{0},{1},{2}".format(system, values2use, energy_dictionary[system]))
         else:
             if values2use[-1] == ",":
                 current_values.append("{0},{1}".format(system, values2use[:-1]))
@@ -825,6 +867,8 @@ for keyword, dictionary in sorted(descriptors.iteritems()):
         output_filename = args.output_general_name + "_structural_descriptors_all_systems.csv"
     elif keyword == "mmgbsa":
         output_filename = args.output_general_name + "_energy_descriptors_all_systems.csv"
+    elif keyword == "rf_score":
+        output_filename = args.output_general_name + "_rf_descriptors_all_systems.csv"
     else:
         unknown_descriptors_counter += 1
         output_filename = args.output_general_name + \
@@ -847,9 +891,9 @@ for keyword, dictionary in sorted(scoring_functions.iteritems()):
                 header = "ID," + keys2use
         if energy_dictionary:
             try:
-                current_values.append("{0},{1}{2}".format(system, values2use, energy_dictionary[system]))
+                energy_dictionary[system]
             except KeyError as e:
-                idx_pattern = r"\w+_(\d+)_"
+                idx_pattern = r"\w+_(\d+)_*"
                 pattern = re.search(idx_pattern, system)
                 if pattern is None:
                     logging.critical("Missing the energy for the system {0}".format(e[0]))
@@ -876,6 +920,14 @@ for keyword, dictionary in sorted(scoring_functions.iteritems()):
                             current_values.append("{0}{1},{2}".format(system, values2use, energy))
                         else:
                             current_values.append("{0},{1},{2}".format(system, values2use, energy))
+            else:
+                # print 'here'
+                if values2use[-1] == ",":
+                    current_values.append("{0},{1}{2}".format(system, values2use, energy_dictionary[system]))
+                elif values2use[0] == ",":
+                    current_values.append("{0}{1},{2}".format(system, values2use, energy_dictionary[system]))
+                else:
+                    current_values.append("{0},{1},{2}".format(system, values2use, energy_dictionary[system]))
         else:
             if values2use[-1] == ",":
                 current_values.append("{0},{1}".format(system, values2use[:-1]))

@@ -2,7 +2,7 @@ dsx_files = "This option specifies the files to use for the extraction of the ds
 xscore_files = "This option specifies the files to use for the extraction of the xscore values."
 binana_files = "This option specifies the files to use for the extraction of the binana values."
 mmgbsa_files = "This option specifies the files to use for the extraction of the mmgbsa values."
-rf_score_file = "This option specifies the files to use for the extraction of the rf_score values."
+rf_as_score_file = "This option specifies the files to use for the extraction of the rf_score values."
 vina_files = "This option specifies the files to use for the extraction of the vina values."
 xglide_file = "This option specifies the log file from xglide to use for the extraction of glide values."
 energies_file = "This option specifies the file containing the experimental energies for all the systems."
@@ -24,3 +24,4 @@ glide_ranking_csv_file = "This option expects two terms. One is a .csv file gene
                          "correspond with the prefix used as base name when exporting the structures from Maestro."
 ensemble_data = "A flag to select use as the id for the systems the pattern 'word_number_number', otherwise the " \
                 "pattern used will be 'word_number'."
+rf_descriptors_file = "A file containing the descriptors used by RF-Score."
