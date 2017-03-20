@@ -39,7 +39,8 @@ def binana_extraction(filename, ensemble_flag):
     values_to_extract = {"2.5_contacts": 0, "4.0_contacts": 0, "hydrophobic": 0, "pi-cation": 0,
                          "salt_bridge": 0, "pi-t": 0, "pi-pi": 0, "sidechain_alpha": 0,
                          "sidechain_beta": 0, "sidechain_other": 0, "backbone_alpha": 0,
-                         "backbone_beta": 0, "backbone_other": 0, "H_B_receptor": 0, "H_B_ligand": 0}
+                         "backbone_beta": 0, "backbone_other": 0, "H_B_D_receptor": 0, "H_B_D_ligand": 0,
+                         "rotatable_bonds": 0}
     read_table = False
     skip = 0
     key = None
@@ -59,6 +60,8 @@ def binana_extraction(filename, ensemble_flag):
                 key = None
                 count, total_count = 0, 0
             continue
+        if "Number of rotatable bonds in the ligand:" in line:
+           values_to_extract["rotatable_bonds"] = int(line.split(":")[-1].strip())
         pattern = re.search(ligand_file_pattern, line, re.IGNORECASE)
         if pattern:
             name = pattern.group(1)
@@ -132,8 +135,8 @@ def binana_extraction(filename, ensemble_flag):
                 total_count += int(count)
                 values_to_extract[key] = str(total_count)
                 # print key,  str(total_count)
-    values_to_extract['H_B_ligand'] = str(h_bonds_dictionary['ligand'])
-    values_to_extract['H_B_ligand'] = str(h_bonds_dictionary['receptor'])
+    values_to_extract['H_B_D_ligand'] = str(h_bonds_dictionary['ligand'])
+    values_to_extract['H_B_D_receptor'] = str(h_bonds_dictionary['receptor'])
     # values_to_extract["flexibility"] = flexible_dictionary_absolute_values
     # for key, value in values_to_extract.iteritems():
     #     values_to_extract[key] = str(key)
@@ -307,7 +310,7 @@ def process_values(dictionary2analyze, keyword2dictionary, possible_name):
     try:
         dictionary2analyze[keyword2dictionary]
     except KeyError:
-        print "dictionary:", dictionary2analyze
+        print "dictionary:", dictionary2analyze.keys()
         print "dict_keyword:", keyword2dictionary
         print 'scoring function/descriptor analyzed:', possible_name
         sys.exit("OK, this shouldn't ever happen. There has been an error with the data you've provided. Review it.")
@@ -546,7 +549,7 @@ if args.binana_files:
         except TypeError:
             continue
         else:
-            descriptors["structural"][pdb_code] = binana_dictio
+            descriptors["structural"][pdb_code] = {"bi_" + k: v for k, v in binana_dictio.iteritems()}
 
 if args.mmgbsa_files:
     descriptors["mmgbsa"] = {}
@@ -602,7 +605,7 @@ if args.obabel_desc:
             except:
                 pass
             else:
-                descriptors["structural"][pdb_code][name] = ligand_descriptors[name]
+                descriptors["structural"][pdb_code]["ob_" + name] = ligand_descriptors[name]
 
 
 if args.rotable_bonds_files:
@@ -612,7 +615,15 @@ if args.rotable_bonds_files:
         descriptors["structural"] = {}
     logging.info("Extracting rotable bonds.")
     for filename in args.rotable_bonds_files:
-        pdb_code = filename.split(os.sep)[-1].split("_ligand.pdbqt")[0]
+        if args.ensemble:
+            name_pattern = r"[_{0}]*(\w+_\d+)_.*ligand".format(os.sep)
+        else:
+            name_pattern = r"[_{0}]*([a-z0-9]+_\d+)_.*ligand".format(os.sep)
+        pattern = re.search(name_pattern, filename, re.IGNORECASE)
+        if pattern:
+            pdb_code = pattern.group(1)
+        else:
+            pdb_code = filename.split(os.sep)[-1].split("_ligand.pdbqt")[0]
         with open(filename, 'r') as infile:
             text = infile.read()
         rotable_bonds_pattern = r"REMARK\s+(\d+)\s+active torsions:"
@@ -670,11 +681,11 @@ if args.rf_descriptors_file:
                     logging.error("ERROR: The file {0} doesn't have the right format".format(args.rf_descriptors_file))
             if ids_key is not None:
                 for line in csvparser:
-                    values = {k: v for k, v in line.iteritems() if k != ids_key and k != "pbindaff"}
+                    values = {"rf_" + k: v for k, v in line.iteritems() if k != ids_key and k != "pbindaff"}
                     if args.ensemble:
                         key = re.search(r"([a-z0-9]+_\d+_\d+)", line[ids_key], re.IGNORECASE).group(1)
                     else:
-                        key = re.search(r"([a-z0-9]+_\d+)_\d+", line[ids_key], re.IGNORECASE).group(1)
+                        key = re.search(r"([a-z0-9]+_\d+)_*\d*", line[ids_key], re.IGNORECASE).group(1)
                     descriptors["rf_score"][key] = values
 
 if args.dsx_files:
