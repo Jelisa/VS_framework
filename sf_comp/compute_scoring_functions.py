@@ -30,6 +30,7 @@ from string import Template
 from subprocess import check_output, STDOUT, CalledProcessError, check_call
 import logging
 import datetime
+from glob import glob
 import pybel as py
 
 import external_software_paths
@@ -535,6 +536,9 @@ for filename in args.input_files:
         errors_counter += 1
     basic_filename = filename.split(os.sep)[-1]
     minimum_filename = basic_filename.split('.pdb')[0]
+    pattern = re.search(r'([a-z0-9]+_\d+)_complex_processed', minimum_filename, re.IGNORECASE)
+    if pattern:
+        minimum_filename = pattern.group(1)
     # Since the structures have been extracted from the trajectory previously and the folder structure has been already
     # created we just need to extract all the files into the same folder as the input file.
 
