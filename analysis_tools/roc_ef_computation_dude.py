@@ -64,47 +64,6 @@ def boolean_matrix_check(matrix):
     return is_boolean
 
 
-def plot_all_sfs(keys, values_matrix, delta_g_values, subfix, ef_thresholds):
-    roc_values = {}
-    ef_dictionary = {}
-    # Plot the image with all the SFs.
-    title = "{0} {1} {2}".format(args.general_title, "All SFS", subfix)
-    fig, ax = pl.subplots()
-    color = pl.cm.rainbow(np.linspace(0, 1, len(keys)))
-    # TODO: check if the energies matrix is boolean or not.
-    if boolean_matrix_check(delta_g_values):
-        actives = delta_g_values[delta_g_values.nonzero()].shape[0]
-    else:
-        tmp = delta_g_values[delta_g_values.nonzero()]
-        actives = tmp[tmp < 0].shape[0]
-    inactives = delta_g_values.shape[0] - actives
-    # print keys
-    for score, c in zip(keys, color):
-        print score,
-        sf2use2 = keys.index(score)
-        # print sf2use2
-        values2study = [[values_matrix[i, sf2use2], delta_g_values[i]] for i in range(len(delta_g_values))]
-        # print values2study2
-        experimental_value_prediction_ordered = [x[1] for x in sorted(values2study)]
-        tpr, fpr, auc_val = compute_roc(experimental_value_prediction_ordered, actives, inactives)
-        roc_values[score] = [fpr, tpr, auc_val]
-        ax.plot(fpr, tpr, label='{0} ROC curve (area = {1:0.2f})'.format(score, auc_val), c=c)
-        print "auc:", auc_val
-        efs = compute_enrichment_factor(experimental_value_prediction_ordered, ef_thresholds, actives)
-        print score, "EF:", efs
-        ef_dictionary[score] = efs
-    ax.plot([0, 1], [0, 1], color='navy', linestyle='--', label="Random selection")
-    ax.legend(loc="lower right")
-    ax.set_ylim([0, 1])
-    ax.set_xlim([0, 1])
-    ax.set_title(title)
-    ax.xaxis.set_label_text("FPR")
-    ax.yaxis.set_label_text("TPR")
-    pl.show()
-    fig.savefig(args.output_prefix + "_{}_all_sfs.png".format(subfix), bbox_inches='tight')
-    return roc_values, ef_dictionary
-
-
 def compute_roc(ordered_list, actives, inactives):
     """
     Function to compute the ROC curve
@@ -133,14 +92,63 @@ def compute_roc(ordered_list, actives, inactives):
     return tpr, fpr, auc_value
 
 
-def compute_enrichment_factor(ordered_list, thresholds_2_use, actives):
+def compute_enrichment_factor(ordered_list, thresholds_2_use, actives, boolean_values):
     enrichment_factor = {}
     enrichment_factor['max'] = 1.0 / (float(actives) / len(ordered_list))
     for n in thresholds_2_use:
-        true_positives = [x for x in ordered_list[:n] if x <= 0]
+        if boolean_values:
+            true_positives = [x for x in ordered_list[:n] if x == 1]
+        else:
+            true_positives = [x for x in ordered_list[:n] if x <= 0]
         enrichment_factor_val = (float(len(true_positives)) / n) / (float(actives) / len(ordered_list))
         enrichment_factor[n] = enrichment_factor_val
     return enrichment_factor
+
+
+def plot_all_sfs(keys, values_matrix, delta_g_values, subfix, ef_thresholds):
+    roc_values = {}
+    ef_dictionary = {}
+    # Plot the image with all the SFs.
+    title = "{0} {1} {2}".format(args.general_title, "All SFS", subfix)
+    fig, ax = pl.subplots()
+    color = pl.cm.rainbow(np.linspace(0, 1, len(keys)))
+    # TODO: check if the energies matrix is boolean or not.
+    if boolean_matrix_check(delta_g_values):
+        boolean_matrix = True
+        actives = delta_g_values[delta_g_values.nonzero()].shape[0]
+    else:
+        boolean_matrix = False
+        tmp = delta_g_values[delta_g_values.nonzero()]
+        actives = tmp[tmp < 0].shape[0]
+    inactives = delta_g_values.shape[0] - actives
+    # print keys
+    for score, c in zip(keys, color):
+        print score,
+        sf2use2 = keys.index(score)
+        # print sf2use2
+        values2study = [[values_matrix[i, sf2use2], delta_g_values[i]] for i in range(len(delta_g_values))]
+        # print values2study2
+        if score == "Exp_energy" and boolean_matrix:
+            experimental_value_prediction_ordered = [x[1] for x in sorted(values2study, reverse=True)]
+        else:
+            experimental_value_prediction_ordered = [x[1] for x in sorted(values2study)]
+        tpr, fpr, auc_val = compute_roc(experimental_value_prediction_ordered, actives, inactives)
+        roc_values[score] = [fpr, tpr, auc_val]
+        ax.plot(fpr, tpr, label='{0} ROC curve (area = {1:0.2f})'.format(score, auc_val), c=c)
+        print "auc:", auc_val
+        efs = compute_enrichment_factor(experimental_value_prediction_ordered, ef_thresholds, actives, boolean_matrix)
+        print score, "EF:", efs
+        ef_dictionary[score] = efs
+    ax.plot([0, 1], [0, 1], color='navy', linestyle='--', label="Random selection")
+    ax.legend(loc="lower right")
+    ax.set_ylim([0, 1])
+    ax.set_xlim([0, 1])
+    ax.set_title(title)
+    ax.xaxis.set_label_text("FPR")
+    ax.yaxis.set_label_text("TPR")
+    pl.show()
+    fig.savefig(args.output_prefix + "_{}_all_sfs.png".format(subfix), bbox_inches='tight')
+    return roc_values, ef_dictionary
 
 
 def write_roc_files(general_dictionary, filename_prefix):
