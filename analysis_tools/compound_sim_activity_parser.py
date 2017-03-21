@@ -38,7 +38,12 @@ with open(args.actives_file) as csvfile:
     for x, line in enumerate(reader):
         try:
             name = line[name_index]
-            equal_index = line.index('=')
+            if "=" in line:
+                equal_index = line.index('=')
+            elif "<" in line:
+                equal_index = line.index('<')
+            elif ">" in line:
+                equal_index = line.index('>')
             experiment_type = line[equal_index - 1]
             experimental_value = line[equal_index + 1]
         except IndexError:
