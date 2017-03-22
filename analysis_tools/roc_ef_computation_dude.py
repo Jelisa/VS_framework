@@ -166,6 +166,7 @@ def write_ef_files(general_dictionary, filename_prefix):
     # for score, values in general_dictionary.iteritems():
     filename = "{0}_ef_values.csv".format(filename_prefix)
     fieldnames = general_dictionary['Exp_energy'].keys()
+    fieldnames.insert(0, 'Exp_energy')
     fieldnames.sort()
     ordered_sfs = ['Exp_energy'] + sorted([ x for x in general_dictionary.keys() if x != "Exp_energy"])
     with open(filename, 'w') as outfile:
