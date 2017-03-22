@@ -92,11 +92,12 @@ for tag, filename in input_files.iteritems():
             if first_line:
                 first_line =False
                 continue
-            a = re.search(".*_(\d+)_*", line[0])
-            if a is None:
-                sim_id = line[0].strip()
-            else:
-                sim_id = a.group(1)
+            # a = re.search(".*_(\d+)_*", line[0])
+            # print line[0]
+            # if a is None:
+            sim_id = line[0].strip()
+            # else:
+            #     sim_id = a.group(1)
             # print sim_id
             # print sim_id_name_dictio.keys()
             compound_name = sim_id_name_dictio[sim_id]
