@@ -94,7 +94,7 @@ def compute_roc(ordered_list, actives, inactives):
 
 def compute_enrichment_factor(ordered_list, thresholds_2_use, actives, boolean_values):
     enrichment_factor = {}
-    enrichment_factor['max'] = 1.0 / (float(actives) / len(ordered_list))
+    # enrichment_factor['max'] = 1.0 / (float(actives) / len(ordered_list))
     for n in thresholds_2_use:
         if boolean_values:
             true_positives = [x for x in ordered_list[:n] if x == 1]
@@ -165,13 +165,16 @@ def write_roc_files(general_dictionary, filename_prefix):
 def write_ef_files(general_dictionary, filename_prefix):
     # for score, values in general_dictionary.iteritems():
     filename = "{0}_ef_values.csv".format(filename_prefix)
-    with open(filename, 'w') as csvfile:
-        csvwriter = csv.writer(csvfile, delimiter=',')
-        # The following line access the first dictionary inside general_dictionary to obtain its keys
-        # and thus obtain the right order of the keys.
-        csvwriter.writerow(['score'] + sorted(general_dictionary[general_dictionary.keys()[0]]))
-        csvwriter.writerows([sc] + [ef_dict[x] for x in sorted(ef_dict.keys())]
-                            for sc, ef_dict in general_dictionary.iteritems())
+    fieldnames = general_dictionary['Exp_energy'].keys()
+    fieldnames.sort()
+    ordered_sfs = ['Exp_energy'] + sorted([ x for x in general_dictionary.keys() if x != "Exp_energy"])
+    with open(filename, 'w') as outfile:
+        csvwriter = csv.DictWriter(outfile, fieldnames=fieldnames)
+        csvwriter.writeheader()
+        for x in ordered_sfs:
+            tmp = {fieldnames[0]: x}
+            tmp.update(ef_dicitonaries1[x])
+            csvwriter.writerow(tmp)
 
 
 parser = ArgumentParser()
