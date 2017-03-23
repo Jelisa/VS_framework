@@ -1,4 +1,5 @@
 import csv
+import pandas as pd
 from argparse import ArgumentParser
 from sklearn.metrics import auc
 import sys
@@ -8,51 +9,6 @@ import re
 import os
 
 import roc_ef_help
-
-
-def obtain_energies_from_activity_file(ids2pick, activity_dictionary):
-    activities = []
-    for identifier in ids2pick:
-        pattern = re.search(r'\w+_(\d+)_', identifier)
-        if pattern is None:
-            pattern = re.search(r'\w+_(\d+)_*', identifier)
-            if pattern is None:
-                number = identifier
-            else:
-                number = pattern.group(1)
-        else:
-            number = pattern.group(1)
-        activities.append(activity_dictionary[number])
-    return np.asarray(activities)
-
-# np.asarray([simulation_activity_dictio[sim_id] for sim_id in systems_ids1])
-
-
-def select_systems(sims2select, sfs2use, sfs_systems):
-    indexes2pick = [index for index, sfs_system in enumerate(sfs_systems) if sfs_system in sims2select]
-    sims_present = [sim for sim in sims2select if sim in sfs_systems]
-    sfs2return = np.asarray([sfs2use[x] for x in indexes2pick])
-    return sfs2return, sims_present
-
-
-def read_scoring_functions_file(filename, keys=None):
-    sfs_array = []
-    ids = []
-    with open(filename, 'r') as infile:
-        for line in infile:
-            if keys is None:
-                keys = line.strip().split(',')[1:]
-            else:
-                lin = line.strip().split(',')[1:]
-                current_id = line.strip().split(',')[0]
-                sfs_array.append([float(x) for x in lin])
-                a = re.search(r"(\w+_\d+)_", current_id)
-                if a:
-                    ids.append(a.group(1))
-                else:
-                    ids.append(current_id)
-    sfs_array = np.asarray(sfs_array)
-    return keys, sfs_array, ids
 
 
 def boolean_matrix_check(matrix):
@@ -75,7 +31,7 @@ def compute_roc(ordered_list, actives, inactives):
     # deltag_non_zero_matrix2 = actives[actives.nonzero()]
     # actives = deltag_non_zero_matrix2.shape[0]
     # inactives2 = actives.shape[0] - actives
-    # print actives2, inactives2
+    # print ordered_list
     tpr, fpr = [], []
     tp = 0.0
     fp = 0.0
@@ -105,40 +61,32 @@ def compute_enrichment_factor(ordered_list, thresholds_2_use, actives, boolean_v
     return enrichment_factor
 
 
-def plot_all_sfs(keys, values_matrix, delta_g_values, subfix, ef_thresholds):
+def plot_all_sfs(if_df, columns2study, subfix, ef_thresholds, gen_title):
     roc_values = {}
     ef_dictionary = {}
     # Plot the image with all the SFs.
-    title = "{0} {1} {2}".format(args.general_title, "All SFS", subfix)
+    title = "{0} {1} {2}".format(gen_title, "All SFS", subfix)
     fig, ax = pl.subplots()
-    color = pl.cm.rainbow(np.linspace(0, 1, len(keys)))
-    # TODO: check if the energies matrix is boolean or not.
-    if boolean_matrix_check(delta_g_values):
+    color = pl.cm.rainbow(np.linspace(0, 1, len(columns2study)))
+    number_of_m = if_df.shape[0]
+    number_of_actives = if_df['activity'].nonzero()[0].shape[0]
+    number_of_inactives = number_of_m - number_of_actives
+    if if_df['activity'].isin([0, 1]).shape == if_df['activity'].shape:
         boolean_matrix = True
-        actives = delta_g_values[delta_g_values.nonzero()].shape[0]
     else:
         boolean_matrix = False
-        tmp = delta_g_values[delta_g_values.nonzero()]
-        actives = tmp[tmp < 0].shape[0]
-    inactives = delta_g_values.shape[0] - actives
-    # print keys
-    for score, c in zip(keys, color):
-        print score,
-        sf2use2 = keys.index(score)
-        # print sf2use2
-        values2study = [[values_matrix[i, sf2use2], delta_g_values[i]] for i in range(len(delta_g_values))]
-        # print values2study2
-        if score == "Exp_energy" and boolean_matrix:
-            experimental_value_prediction_ordered = [x[1] for x in sorted(values2study, reverse=True)]
-        else:
-            experimental_value_prediction_ordered = [x[1] for x in sorted(values2study)]
-        tpr, fpr, auc_val = compute_roc(experimental_value_prediction_ordered, actives, inactives)
-        roc_values[score] = [fpr, tpr, auc_val]
-        ax.plot(fpr, tpr, label='{0} ROC curve (area = {1:0.2f})'.format(score, auc_val), c=c)
-        print "auc:", auc_val
-        efs = compute_enrichment_factor(experimental_value_prediction_ordered, ef_thresholds, actives, boolean_matrix)
-        print score, "EF:", efs
+    if_df.sort_values(["activity"], inplace=True)
+    ef_dictionary["Exp_energy"] = compute_enrichment_factor(if_df['activity'], ef_thresholds,
+                                                            number_of_actives, boolean_matrix)
+    for score, c in zip(columns2study, color):
+        if_df.sort_values([score], inplace=True)
+        names = list(if_df['name'])
+        activities = list(if_df['activity'])
+        tpr, fpr, auc_val = compute_roc(if_df['activity'].values, number_of_actives, number_of_inactives)
+        roc_values[score] = [activities, names, fpr, tpr, auc_val]
+        efs = compute_enrichment_factor(if_df['activity'], ef_thresholds, number_of_actives, boolean_matrix)
         ef_dictionary[score] = efs
+        ax.plot(fpr, tpr, label='{0} ROC curve (area = {1:0.2f})'.format(score, auc_val), c=c)
     ax.plot([0, 1], [0, 1], color='navy', linestyle='--', label="Random selection")
     ax.legend(loc="lower right")
     ax.set_ylim([0, 1])
@@ -148,34 +96,34 @@ def plot_all_sfs(keys, values_matrix, delta_g_values, subfix, ef_thresholds):
     ax.yaxis.set_label_text("TPR")
     pl.show()
     fig.savefig(args.output_prefix + "_{}_all_sfs.png".format(subfix), bbox_inches='tight')
+
     return roc_values, ef_dictionary
 
 
-def write_roc_files(general_dictionary, filename_prefix):
-    for score, values in general_dictionary.iteritems():
-        filename = "{0}_roc_curve_values_{1}.csv".format(filename_prefix, score)
-        fpr, tpr, auc = values
-        with open(filename, 'w') as csvfile:
-            csvwriter = csv.writer(csvfile, delimiter=',')
-            csvwriter.writerow(["FPR", "TPR", "AUC"])
-            csvwriter.writerow([fpr[0], tpr[0], auc])
-            csvwriter.writerows([[x, y] for x, y in zip(fpr[1:], tpr[1:])])
-
-
 def write_ef_files(general_dictionary, filename_prefix):
-    # for score, values in general_dictionary.iteritems():
     filename = "{0}_ef_values.csv".format(filename_prefix)
     fieldnames = general_dictionary['Exp_energy'].keys()
     fieldnames.sort()
     fieldnames.insert(0, 'Score')
-    ordered_sfs = ['Exp_energy'] + sorted([ x for x in general_dictionary.keys() if x != "Exp_energy"])
+    ordered_sfs = ['Exp_energy'] + sorted([x for x in general_dictionary.keys() if x != "Exp_energy"])
     with open(filename, 'w') as outfile:
         csvwriter = csv.DictWriter(outfile, fieldnames=fieldnames)
         csvwriter.writeheader()
         for x in ordered_sfs:
             tmp = {fieldnames[0]: x}
-            tmp.update(ef_dicitonaries1[x])
+            tmp.update(general_dictionary[x])
             csvwriter.writerow(tmp)
+
+
+def write_roc_files(general_dictionary, filename_prefix):
+    for score, values in general_dictionary.iteritems():
+        filename = "{0}_roc_curve_values_{1}.csv".format(filename_prefix, score)
+        activity, names, fpr, tpr, auc = values
+        with open(filename, 'w') as csvfile:
+            csvwriter = csv.writer(csvfile, delimiter=',')
+            csvwriter.writerow(["Activity", "Name", "FPR", "TPR", "AUC"])
+            csvwriter.writerow([activity[0], names[0], fpr[0], tpr[0], auc])
+            csvwriter.writerows([[x, y, z, q] for x, y, z, q in zip(activity[1:], names[1:], fpr[1:], tpr[1:])])
 
 
 parser = ArgumentParser()
@@ -186,24 +134,16 @@ parser.add_argument("-output_prefix", default="roc_ef_comp", help=roc_ef_help.ou
 parser.add_argument("-activities_file", required=True, help=roc_ef_help.activities_file_help)
 parser.add_argument("-ef_thresholds", default=[10, 20, 50, 100, 250, 500], type=int, nargs='+')
 parser.add_argument("-output_folder", default=".")
-parser.add_argument("-systems2use", default=False)
+parser.add_argument("-systems2use1", default=False)
+parser.add_argument("-systems2use0", default=False)
 args = parser.parse_args()
 
-# Piece of code to set the images size.
-# Get current size
 fig_size = pl.rcParams["figure.figsize"]
 
-# Prints: [8.0, 6.0]
-print "Current size:", fig_size
-
 # Set figure width to 12 and height to 9
-
 fig_size[0] = 13
 fig_size[1] = 10
 pl.rcParams["figure.figsize"] = fig_size
-print "Current size:", fig_size
-
-roc_values0 = {}
 
 if args.output_folder != "'.":
     if args.output_folder[-1] != os.sep:
@@ -212,66 +152,54 @@ if args.output_folder != "'.":
         os.mkdir(args.output_folder)
     args.output_prefix = args.output_folder + args.output_prefix
 
-simulation_activity_dictio = {}
-simulation_name_dictio = {}
-with open(args.activities_file) as csvfile:
-    csvparser = csv.DictReader(csvfile)
-    for line in csvparser:
-        molecule_name = line['name']
-        sim_id = line['sim_id']
-        activity = int(line['activity'])
-        simulation_activity_dictio[sim_id] = activity
-        simulation_name_dictio[sim_id] = molecule_name
+name_sim_activity_df = pd.read_csv(args.activities_file)
 
-ids2select = []
-if args.systems2use:
-    with open(args.systems2use) as infile:
-        csv_parser = csv.DictReader(infile, delimiter=',')
-        ids2select = [line['ID'] for line in csv_parser]
+if_sfs_df = pd.read_csv(args.all_sfs_file)
+ids2select_df = None
+ids2select_df0 = None
+if args.systems2use1:
+    ids2select_df = pd.read_csv(args.systems2use1)
+    if_sfs_df = if_sfs_df.loc[if_sfs_df['ID'].isin(ids2select_df['ID'])]
+    ids2select_df0 = ids2select_df
+if args.systems2use0:
+    ids2select_df0 = pd.read_csv(args.systems2use0)
 
-
-# Defines a matrix from the _all_sfs_merged.csv with all the sfs values and a to lists
-# that are used later for the rest of the script as the dictionary with the systems to use
-# keys Will be used as the dictionary to substract the different SFs.
-# all_sf_values1 Will become a matrix containing the values for all the SFs.
-# systems_ids1 Will be used as the dictionary containing the systems to use.
-# print all_sf_filename
-print "Working with the file: {0}".format(args.all_sfs_file)
-keys1, all_sf_values1, systems_ids1 = read_scoring_functions_file(args.all_sfs_file)
-if ids2select:
-    all_sf_values1, systems_ids1 = select_systems(ids2select, all_sf_values1, systems_ids1)
-if "Exp_energy" in keys1:
-    delta_g_values1 = all_sf_values1[:, keys1.index("Exp_energy")]
+if "Exp_energy" in if_sfs_df.columns:
+    if_df = if_sfs_df.merge(name_sim_activity_df[['sim_id', 'name']], left_on="ID", right_on="sim_id")
+    if_df.rename(columns={"Exp_energy": "activity"}, inplace=True)
 else:
-    delta_g_values1 = obtain_energies_from_activity_file(systems_ids1, simulation_activity_dictio)
+    if_df = if_sfs_df.merge(name_sim_activity_df[['sim_id', 'name', "activity"]], left_on="ID", right_on="sim_id")
+if_df.drop(['sim_id'], axis=1, inplace=True)
 
-roc_values1, ef_dicitonaries1 = plot_all_sfs(keys1, all_sf_values1, delta_g_values1, "if", args.ef_thresholds)
-
+scores1 = [score for score in if_df.columns if score not in ["ID", "activity", "name"]]
+roc_values1, ef_dictionary1 = plot_all_sfs(if_df, scores1, 'if', args.ef_thresholds, args.general_title)
 write_roc_files(roc_values1, args.output_prefix + "_if")
-write_ef_files(ef_dicitonaries1, args.output_prefix + "_if")
+# print ef_dictionary1.keys()
+write_ef_files(ef_dictionary1, args.output_prefix + "_if")
 
-# print 0, keys1
-# print len(keys1), all_sf_values1.shape
 if args.previous_scoring_functions_file:
-    print "Working with the file: {0}".format(args.all_sfs_file)
-    keys0, all_sf_values0, systems_ids0 = read_scoring_functions_file(args.previous_scoring_functions_file)
-    if ids2select:
-        all_sf_values0, systems_ids0 = select_systems(ids2select, all_sf_values0, systems_ids1)
-    if "Exp_energy" in keys1:
-        delta_g_values0 = all_sf_values0[:, keys0.index("Exp_energy")]
+    ini_sfs_df = pd.read_csv(args.previous_scoring_functions_file)
+    if not ids2select_df0.empty:
+        ini_sfs_df = ini_sfs_df.loc[ini_sfs_df['ID'].isin(ids2select_df0['ID'])]
+    if "Exp_energy" in ini_sfs_df.columns:
+        ini_df = ini_sfs_df.merge(name_sim_activity_df[['sim_id', 'name']], left_on="ID", right_on="sim_id")
+        ini_df.rename(columns={"Exp_energy": "activity"}, inplace=True)
     else:
-        delta_g_values0 = obtain_energies_from_activity_file(systems_ids0, simulation_activity_dictio)
-    roc_values0, ef_dicitonaries0 = plot_all_sfs(keys0, all_sf_values0, delta_g_values0, 'init', args.ef_thresholds)
+        ini_df = if_sfs_df.merge(name_sim_activity_df[['sim_id', 'name', "activity"]], left_on="ID", right_on="sim_id")
+    ini_df.drop(['sim_id'], axis=1, inplace=True)
+    print ini_df.shape
+    scores0 = [score for score in ini_df.columns if score not in ["ID", "activity", "name"]]
+    roc_values0, ef_dictionary0 = plot_all_sfs(ini_df, scores0, 'init', args.ef_thresholds, args.general_title)
     write_roc_files(roc_values0, args.output_prefix + "_init")
-    write_ef_files(ef_dicitonaries0, args.output_prefix + "_init")
-    common_scores = set.intersection(set(keys1), set(keys0))
+    write_ef_files(ef_dictionary0, args.output_prefix + "_init")
+    common_scores = set.intersection(set(scores1), set(scores0))
     for score in common_scores:
-        title = "{0}  (SF:{1} comparisson) ".format(args.general_title, score)
+        title = "{0}  (SF:{1} comparison) ".format(args.general_title, score)
         fig_tmp, ax_tmp = pl.subplots()
         print score,
         # print roc_values0
-        fpr0, tpr0, auc_val0 = roc_values0[score]
-        fpr1, tpr1, auc_val1 = roc_values1[score]
+        activities1, names1, fpr0, tpr0, auc_val0 = roc_values0[score]
+        activities0, names0, fpr1, tpr1, auc_val1 = roc_values1[score]
         ax_tmp.plot(fpr0, tpr0, label='initial {0} ROC curve (area = {1:0.2f})'.format(score, auc_val0), c='r')
         ax_tmp.plot(fpr1, tpr1, label='i.f. {0} ROC curve (area = {1:0.2f})'.format(score, auc_val1), c='b')
         print "delta auc: {0:6.4}".format(auc_val1 - auc_val0)
@@ -284,6 +212,9 @@ if args.previous_scoring_functions_file:
         ax_tmp.yaxis.set_label_text("TPR")
         pl.show()
         fig_tmp.savefig(args.output_prefix + "_{}_comparison.png".format(score), bbox_inches='tight')
-    delta_ef = {score: {th: ef_dicitonaries1[score][th] - ef_dicitonaries0[score][th] for th in args.ef_thresholds}
+    common_scores.update({"Exp_energy"})
+    delta_ef = {score: {th: ef_dictionary1[score][th] - ef_dictionary0[score][th] for th in args.ef_thresholds}
                 for score in common_scores}
+    # print delta_ef.keys()
     write_ef_files(delta_ef, args.output_prefix + "_delta")
+
