@@ -75,7 +75,7 @@ def plot_all_sfs(if_df, columns2study, subfix, ef_thresholds, gen_title):
         boolean_matrix = True
     else:
         boolean_matrix = False
-    if_df.sort_values(["activity"], inplace=True)
+    if_df.sort_values(["activity"], inplace=True, ascending=False)
     ef_dictionary["Exp_energy"] = compute_enrichment_factor(if_df['activity'], ef_thresholds,
                                                             number_of_actives, boolean_matrix)
     for score, c in zip(columns2study, color):
@@ -144,6 +144,7 @@ fig_size = pl.rcParams["figure.figsize"]
 fig_size[0] = 13
 fig_size[1] = 10
 pl.rcParams["figure.figsize"] = fig_size
+pl.ion()
 
 if args.output_folder != "'.":
     if args.output_folder[-1] != os.sep:
