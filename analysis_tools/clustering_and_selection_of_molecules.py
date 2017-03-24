@@ -22,12 +22,11 @@ args = parser.parse_args()
 
 input_files = {}
 out_filenames = {}
-
 # Extract the tags for the filenames
 for filename in args.sfs_file:
     if re.match(r".*mm[-_]*gbsa[_-]*.*", filename, re.IGNORECASE):
         scoring_function = "mm_gbsa"
-    elif re.match(".*glide.*", filename, re.IGNORECASE):
+    elif re.match(".*_glide_.*", filename, re.IGNORECASE):
         if re.match(".*glideSP.*", filename, re.IGNORECASE):
             scoring_function = "glideSP"
         elif re.match(".*glideXP.*", filename, re.IGNORECASE):
