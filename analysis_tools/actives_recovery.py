@@ -69,8 +69,8 @@ total_inactives_compounds = list(set(total_inactives_variants))
 total_compounds = float(len(total_actives_compounds) + len(total_inactives_compounds))
 total_variants = float(len(total_actives_variants) + len(total_inactives_variants))
 
-total_percentage_active_compounds = len(total_actives_compounds) / total_compounds
-total_percentage_active_variants = len(total_actives_variants) / total_variants
+total_percentage_active_compounds = len(total_actives_compounds) / total_compounds * 100.0
+total_percentage_active_variants = len(total_actives_variants) / total_variants * 100.0
 
 
 print "processing the file {0}".format(args.glide_ranking)
@@ -82,13 +82,13 @@ with open(args.glide_ranking) as infile:
 after_glide_actives_variants = [comp for comp in sim_name_dictio.values() if comp in total_actives_compounds]
 after_glide_inactives_variants = [comp for comp in sim_name_dictio.values() if comp in total_inactives_compounds]
 
-after_glide_percentage_active_variants = len(after_glide_actives_variants) / float(len(sim_name_dictio.values()))
+after_glide_percentage_active_variants = len(after_glide_actives_variants) / float(len(sim_name_dictio.values())) * 100.0
 
 after_glide_compounds = list(set(sim_name_dictio.values()))
 after_glide_actives_compounds = [comp for comp in after_glide_compounds if comp in total_actives_compounds]
 after_glide_inactives_compounds = [comp for comp in after_glide_compounds if comp in total_inactives_compounds]
 
-after_glide_percentage_active_compounds = len(after_glide_actives_compounds) / float(len(after_glide_compounds))
+after_glide_percentage_active_compounds = len(after_glide_actives_compounds) / float(len(after_glide_compounds)) * 100.0
 
 # lines = text.splitlines()
 store_mis_conf_file = False
@@ -149,17 +149,17 @@ if last_sim - failed_systems != after_pele_simulations_num:
 into_pele_variants = [v for key, v in sim_name_dictio.iteritems() if key <= last_sim and
                       v not in missing_conf_file_simulations]
 into_pele_active_variants = [v for v in into_pele_variants if v in total_actives_variants]
-into_pele_active_variants_percentage = len(into_pele_active_variants) / float(len(into_pele_variants))
+into_pele_active_variants_percentage = len(into_pele_active_variants) / float(len(into_pele_variants)) * 100.0
 into_pele_compounds = list(set(into_pele_variants))
 into_pele_active_compounds = [comp for comp in into_pele_compounds if comp in total_actives_compounds]
-into_pele_active_compounds_percentage = len(into_pele_active_compounds) / float(len(into_pele_compounds))
+into_pele_active_compounds_percentage = len(into_pele_active_compounds) / float(len(into_pele_compounds)) * 100.0
 
 after_pele_variants = [v for v in into_pele_variants if v not in pele_failed_simulations]
 after_pele_active_variants = [v for v in after_pele_variants if v in total_actives_variants]
-after_pele_active_variants_percentage = len(after_pele_active_variants) / float(len(after_pele_variants))
+after_pele_active_variants_percentage = len(after_pele_active_variants) / float(len(after_pele_variants)) * 100.0
 after_pele_compounds = list(set(after_pele_variants))
 after_pele_active_compounds = [v for v in after_pele_compounds if v in total_actives_compounds]
-after_pele_active_compounds_percentage = len(after_pele_active_compounds) / float(len(after_pele_compounds))
+after_pele_active_compounds_percentage = len(after_pele_active_compounds) / float(len(after_pele_compounds)) * 100.0
 
 variants_dictio = {}
 variants_dictio['initial'] = {'actives': len(total_actives_variants),
