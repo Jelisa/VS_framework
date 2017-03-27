@@ -21,7 +21,7 @@ def find_sim_id(line_text):
     :return: The ID of the simulation according to a specific patterns or False if the line
             doesn't match the patterns.
     """
-    pattern = re.search(r'\+ [a-zA-Z]+_(\d+){0}\w+.log'.format(os.sep), line_text)
+    pattern = re.search(r'\+ [a-zA-Z0-9]+_(\d+){0}\w+.log'.format(os.sep), line_text)
     if pattern is None:
         if os.sep in line_text:
             idt = line_text.split(os.sep)[0].split()[-1]
