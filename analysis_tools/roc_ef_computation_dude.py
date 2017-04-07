@@ -80,10 +80,11 @@ def plot_all_sfs(if_df, columns2study, subfix, ef_thresholds, gen_title):
                                                             number_of_actives, boolean_matrix)
     for score, c in zip(columns2study, color):
         if_df.sort_values([score], inplace=True)
-        names = list(if_df['name'])
+        compound_names = list(if_df['name'])
+        sim_id = list(if_df['ID'])
         activities = list(if_df['activity'])
         tpr, fpr, auc_val = compute_roc(if_df['activity'].values, number_of_actives, number_of_inactives)
-        roc_values[score] = [activities, names, fpr, tpr, auc_val]
+        roc_values[score] = [sim_id, activities, compound_names, fpr, tpr, auc_val]
         efs = compute_enrichment_factor(if_df['activity'], ef_thresholds, number_of_actives, boolean_matrix)
         ef_dictionary[score] = efs
         ax.plot(fpr, tpr, label='{0} ROC curve (area = {1:0.2f})'.format(score, auc_val), c=c)
@@ -118,12 +119,13 @@ def write_ef_files(general_dictionary, filename_prefix):
 def write_roc_files(general_dictionary, filename_prefix):
     for score, values in general_dictionary.iteritems():
         filename = "{0}_roc_curve_values_{1}.csv".format(filename_prefix, score)
-        activity, names, fpr, tpr, auc = values
+        sim_ids, activity, names, fpr, tpr, auc = values
         with open(filename, 'w') as csvfile:
             csvwriter = csv.writer(csvfile, delimiter=',')
-            csvwriter.writerow(["Activity", "Name", "FPR", "TPR", "AUC"])
-            csvwriter.writerow([activity[0], names[0], fpr[0], tpr[0], auc])
-            csvwriter.writerows([[x, y, z, q] for x, y, z, q in zip(activity[1:], names[1:], fpr[1:], tpr[1:])])
+            csvwriter.writerow(["sim_ID", "Activity", "Name", "FPR", "TPR", "AUC"])
+            csvwriter.writerow([sim_ids[0], activity[0], names[0], fpr[0], tpr[0], auc])
+            csvwriter.writerows([[x, y, p, z, q] for x, y, p, z, q in zip(sim_ids[1:], activity[1:], names[1:],
+                                                                          fpr[1:], tpr[1:])])
 
 
 parser = ArgumentParser()
@@ -180,7 +182,7 @@ write_ef_files(ef_dictionary1, args.output_prefix + "_if")
 
 if args.previous_scoring_functions_file:
     ini_sfs_df = pd.read_csv(args.previous_scoring_functions_file)
-    if not ids2select_df0.empty:
+    if ids2select_df0 is not None:
         ini_sfs_df = ini_sfs_df.loc[ini_sfs_df['ID'].isin(ids2select_df0['ID'])]
     if "Exp_energy" in ini_sfs_df.columns:
         ini_df = ini_sfs_df.merge(name_sim_activity_df[['sim_id', 'name']], left_on="ID", right_on="sim_id")
