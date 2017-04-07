@@ -482,6 +482,7 @@ parser.add_argument("-xglide_files", default=False, nargs="+", help=extract_sf_h
 parser.add_argument("-glide_ranking_csv_file", default=False, nargs=2,
                     help=extract_sf_help.glide_ranking_csv_file)
 parser.add_argument("-pele_file", default=False, help=extract_sf_help.pele_file)
+parser.add_argument("-pele_mean_file", default=False, help=extract_sf_help.pele_mean_file)
 parser.add_argument("-mmgbsa_as_sf", action="store_true", help=extract_sf_help.mmgbsa_as_sf)
 parser.add_argument("-rotable_bonds_files", default=False, nargs="+", help=extract_sf_help.rotable_bonds_files)
 parser.add_argument("-energies_file", default=False, help=extract_sf_help.energies_file)
@@ -494,13 +495,15 @@ parser.add_argument("-conversion_r_value", "-R", default=0.002, help=extract_sf_
 parser.add_argument("-output_general_name", required=True, help=extract_sf_help.output_general_name)
 parser.add_argument("-ensemble", action="store_true", help=extract_sf_help.ensemble_data)
 parser.add_argument("-log_file", default="sf_extraction_log.txt", help=extract_sf_help.log_file)
+parser.add_argument("-common_systems_list", action="store_true",
+                    help=extract_sf_help.common_systems_list)
 args = parser.parse_args()
 
 # with this line I check if any of the scoring functions has been entered.
 if not {key: value for key, value in vars(args).iteritems() if "file" in key and 'log' not in key and value}:
     parser.error("No action requested. At least one of the scoring functions or descriptors should be provided.")
 
-logging.basicConfig(filename="sf_extraction_log.txt", format="%(message)s", level=logging.INFO, filemode="w")
+logging.basicConfig(filename=args.log_file, format="%(message)s", level=logging.INFO, filemode="w")
 logging.info("{} : Program starting".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M")))
 
 warnings_counter = 0
@@ -800,9 +803,17 @@ for dictionary in scoring_functions.values() + descriptors.values():
         systems_with_all_sfs_descriptors = systems_with_all_sfs_descriptors.intersection(set(dictionary.keys()))
         all_systems = all_systems.union(set(dictionary.keys()))
 
+missing_systems = all_systems.difference(systems_with_all_sfs_descriptors)
+
 logging.info("{0:d} systems out of {1:d} have all the scoring functions and descriptors correctly "
              "computed".format(len(systems_with_all_sfs_descriptors), len(all_systems)))
+logging.info("The list with the systems for which something went wrong (if any) is at the end.")
+
 if systems_with_all_sfs_descriptors:
+    if args.common_systems_list:
+        output_name = args.output_general_name + '_common_systems.csv'
+        with open(output_name, 'w') as outfile:
+            outfile.write(("\n".join(systems_with_all_sfs_descriptors)))
     if descriptors:
         logging.info("Writing the merged file for the descriptors.")
         merge_data(descriptors, "descriptors", systems_with_all_sfs_descriptors, energy_dictionary,
@@ -955,6 +966,7 @@ for keyword, dictionary in sorted(scoring_functions.iteritems()):
     output_filename = args.output_general_name + "_" + keyword + "_all_systems.csv"
     with open(output_filename, 'w') as outfile:
         outfile.write(text)
-
+if missing_systems:
+    logging.info("The failing systems are:{0}".format("\n- " + "\n- ".join(missing_systems)))
 logging.info("{} : Program finished correctly.".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M")))
 logging.shutdown()
