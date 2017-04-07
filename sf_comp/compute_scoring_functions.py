@@ -340,12 +340,12 @@ def binana_execution(receptor_filename, ligand_filename, execution_folder):
             binana_outfile.write(binana_output)
 
 
-def mmgbsa_execution(complex_filename, execution_folder, host, number_cpus):
+def mmgbsa_execution(complex_filename, execution_folder, host, number_cpus, lig_chain):
     if args.debug:
         print "Executing mmgbsa"
-    mmgbsa_command = "{0}prime_mmgbsa;{1};-csv;yes;-ligand;'chain.name  Z ';" \
+    mmgbsa_command = "{0}prime_mmgbsa;{1};-csv;yes;-ligand;'chain.name  {4} ';" \
                      "-HOST;{2}:{3};-WAIT".format(external_software_paths.schrodinger_path,
-                                                   complex_filename, host, number_cpus)
+                                                   complex_filename, host, number_cpus, lig_chain)
     if args.debug:
         print mmgbsa_command.split(';')
     try:
@@ -366,6 +366,7 @@ parser.add_argument("-vina_box_distance_to_ligand", default=20, type=int)
 parser.add_argument("-experimental_deltag", default="")
 parser.add_argument("-rf_score_output_file", default=-2)
 parser.add_argument("-debug", default=False, action="store_true")
+parser.add_argument("-ligand_chain", default="Z")
 parser.add_argument("-log_file", default="scoring_function_computations_log.txt")
 parser.add_argument("-rewrite", action="store_true")
 args = parser.parse_args()
@@ -554,7 +555,7 @@ for filename in args.input_files:
     logging.info(" - Separating ligand and protein")
     try:
         protein_filename_pdb, protein_with_waters_pdb, \
-        waters_filename_pdb, ligand_filename_pdb = extract_ligand(filename, minimum_filename, "Z", working_folder)
+        waters_filename_pdb, ligand_filename_pdb = extract_ligand(filename, minimum_filename, args.ligand_chain, working_folder)
     except TypeError:
         logging.error(" - This system will be discontinued, due to a problem in the "
                       "separation of the ligand and protein.")
@@ -719,7 +720,7 @@ for filename in args.input_files:
             logging.info(" - Converting receptor to .pdbqt")
             receptor_filename_pdbqt, warnings_counter = structures_conversion_pdb_to_format(protein_filename_pdb,
                                                                                             ".pdbqt",
-                                                                                            prepare_ligand_vina_command,
+                                                                                            prepare_receptor_vina_command,
                                                                                             warnings_counter,
                                                                                             working_folder, "pdbqt",
                                                                                             args.rewrite)
@@ -743,7 +744,7 @@ for filename in args.input_files:
             logging.info(" - Converting receptor to .pdbqt")
             receptor_filename_pdbqt, warnings_counter = structures_conversion_pdb_to_format(protein_filename_pdb,
                                                                                             ".pdbqt",
-                                                                                            prepare_ligand_vina_command,
+                                                                                            prepare_receptor_vina_command,
                                                                                             warnings_counter,
                                                                                             working_folder, "pdbqt",
                                                                                             args.rewrite)
@@ -765,7 +766,8 @@ for filename in args.input_files:
             old_warnings = warnings_counter
         else:
             logging.info(" - Executing mmgbsa")
-            mmgbsa_execution(complex_filename_mae, working_folder, args.schrodinger_host, args.schrodinger_cpus)
+            mmgbsa_execution(complex_filename_mae, working_folder, args.schrodinger_host, args.schrodinger_cpus,
+                             args.ligand_chain)
 
 if errors_counter == len(args.input_files):
     logging.critical("None of the systems could be processed.\nTerminating the program.")
@@ -800,7 +802,7 @@ if compute_rf_score:
     else:
         rf_output_folder = args.rf_score_output_file
     rf_output_filename = rf_output_folder + "rf_descriptors_input_file.txt"
-    rf_descriptors_output_filename = rf_output_folder + "rf_descriptors_output_file.txt"
+    rf_descriptors_output_filename = rf_output_folder + "rf_descriptors_output_file.csv"
     logging.info("Writing the initial file for RF-Score: {0}".format(rf_output_filename))
     with open(rf_output_filename, 'w') as outfile:
         outfile.write("\n".join(["{0},{1}".format(key, value) for key, value in
