@@ -201,8 +201,8 @@ if args.previous_scoring_functions_file:
         fig_tmp, ax_tmp = pl.subplots()
         print score,
         # print roc_values0
-        activities1, names1, fpr0, tpr0, auc_val0 = roc_values0[score]
-        activities0, names0, fpr1, tpr1, auc_val1 = roc_values1[score]
+        sim_ids1, activities1, names1, fpr0, tpr0, auc_val0 = roc_values0[score]
+        sim_ids0, activities0, names0, fpr1, tpr1, auc_val1 = roc_values1[score]
         ax_tmp.plot(fpr0, tpr0, label='initial {0} ROC curve (area = {1:0.2f})'.format(score, auc_val0), c='r')
         ax_tmp.plot(fpr1, tpr1, label='i.f. {0} ROC curve (area = {1:0.2f})'.format(score, auc_val1), c='b')
         print "delta auc: {0:6.4}".format(auc_val1 - auc_val0)
