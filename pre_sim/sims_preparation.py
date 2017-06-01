@@ -21,7 +21,7 @@ from subprocess import check_output, CalledProcessError, check_call, STDOUT
 from glob import glob
 from tempfile import mkdtemp
 import numpy as np
-# from modules import module
+from modules import module
 
 import enviroment_parameters
 import help_descriptions
@@ -157,7 +157,11 @@ def compute_center_of_mass(lig_filename):
 def check_previous_next(prev_element, next_element, current_element, n, reset):
     # if args.debug:
     #     print type(n), n, type(reset), reset
-    if prev_element and prev_element == "TER":
+    if prev_element and prev_element == "TER" and next_element and next_element == "TER":
+        atom_id = '"{}:{}:{}"'.format(current_element[21], current_element[22:26].strip(),
+                                      current_element[12:16].replace(" ", "_"))
+        n = 0
+    elif prev_element and prev_element == "TER":
         atom_id = '"{}:{}:{}"'.format(current_element[21], current_element[22:26].strip(),
                                       current_element[12:16].replace(" ", "_"))
         n = 0
@@ -197,6 +201,7 @@ def obtain_constraints_from_pdb(pdb_filename, every, constraint, atoms2restrain)
         print constraint
         print atoms2restrain
     for index, element in enumerate(pdb_text):
+        element = element.strip()
         if args.debug:
             print element
         if element.strip() == "TER":
@@ -206,7 +211,7 @@ def obtain_constraints_from_pdb(pdb_filename, every, constraint, atoms2restrain)
                 if pdb_text[index - 1] == "TER" or pdb_text[index + 1] == "TER":
                     print "Review the file {}. The initial residue from the first chain followed or preceded" \
                           " by a TER mark."
-                    return False
+                    # return False
                 else:
                     first = False
                     constraints_text += header
@@ -240,9 +245,9 @@ def obtain_constraints_from_pdb(pdb_filename, every, constraint, atoms2restrain)
 
 
 def obtain_current_values(template_keywords, complex_complete_path, warnings, errors):
-    keywords_values = {}
+    # keywords_values = {}
     for keyword in template_keywords:
-        if search(".*constraints", keyword, IGNORECASE):
+        if search(".*constraints", keyword, IGNORECASE) and keyword not in keywords_values.values():
             if args.debug:
                 print "file4pele: ", complex_complete_path
             constraints = obtain_constraints_from_pdb(complex_complete_path, args.every, args.constraint,
@@ -252,6 +257,8 @@ def obtain_current_values(template_keywords, complex_complete_path, warnings, er
                 logging.error("  ERROR: Couldn't generate the constraints for file {}".format(complex_complete_path))
                 logging.info(" This system will be discontinued since constraints couldn't be generated.")
                 errors += 1
+                if args.debug:
+                    print "couldn't generate the constraints."
                 return False, warnings, errors
             # obtain constraints from a pdb file
             keywords_values[keyword] = constraints
@@ -375,6 +382,7 @@ parser.add_argument("-obc_param_generator", default=enviroment_parameters.obc_pa
 parser.add_argument("-ligand_chain", default=enviroment_parameters.ligand_chain,
                     help=help_descriptions.ligand_chain_desc)
 parser.add_argument("-no_templates", action="store_true", help=help_descriptions.no_templates)
+parser.add_argument("-complex_subfix", default="")
 # parser.add_argument("-sub_template", default="./submit_template.sh")
 args = parser.parse_args()
 
@@ -391,22 +399,22 @@ logging.info("{} : Program starting".format(datetime.datetime.now().strftime("%Y
 # Commands AZ
 # This line is mandatory only for AZ, as the import
 # The first thing is to load the schrodinger module
-# module("load", "schrodinger/2016.01")
+#module("load", "schrodinger/2016.01")
 # Then we load the commands from the constant values depending on where we are.
-# schrodinger_mae2pdb_convert_command = "pdbconvert -imae {} -opdb {}"
-# schrodinger_pdb2mae_convert_command = "pdbconvert  -ipdb {} -omae {}"
-# ploprottemp = "{}/utilities/python {}".format(args.schrodinger_path, args.plop_path)
-# ploprottemp_command = ploprottemp + " {} -mae_charges=no -mtor=5 -g=30 -clean=yes"
-# mutations_program_command = "python " + args.mutations_program_path + \
-#                             " -ipdb {} -make_unique Z -gaps_ter "
-# Commands BSC
-schrodinger_converter = "{}/utilities/pdbconvert ".format(args.schrodinger_path)
-schrodinger_mae2pdb_convert_command = schrodinger_converter + " -imae {} -opdb {}"
-schrodinger_pdb2mae_convert_command = schrodinger_converter + " -ipdb {} -omae {}"
+schrodinger_mae2pdb_convert_command = "pdbconvert -imae {} -opdb {}"
+schrodinger_pdb2mae_convert_command = "pdbconvert  -ipdb {} -omae {}"
 ploprottemp = "{}/utilities/python {}".format(args.schrodinger_path, args.plop_path)
 ploprottemp_command = ploprottemp + " {} -mae_charges=no -mtor=5 -g=30 -clean=yes"
 mutations_program_command = "python " + args.mutations_program_path + \
                             " -ipdb {} -make_unique Z -gaps_ter "
+# Commands BSC
+# schrodinger_converter = "{}/utilities/pdbconvert ".format(args.schrodinger_path)
+# schrodinger_mae2pdb_convert_command = schrodinger_converter + " -imae {} -opdb {}"
+# schrodinger_pdb2mae_convert_command = schrodinger_converter + " -ipdb {} -omae {}"
+# ploprottemp = "{}/utilities/python {}".format(args.schrodinger_path, args.plop_path)
+# ploprottemp_command = ploprottemp + " {} -mae_charges=no -mtor=5 -g=30 -clean=yes"
+# mutations_program_command = "python " + args.mutations_program_path + \
+#                             " -ipdb {} -make_unique Z -gaps_ter "
 
 mutations_program_command_receptor = "python " + args.mutations_program_path + \
                             " -ipdb {} -gaps_ter "
@@ -557,6 +565,25 @@ if search("none", args.conf_template, IGNORECASE) is None:
         template_text = "".join(template_file.readlines())
         keywords_in_the_template = set(pattern.group(1) for pattern in finditer("\$\{*(\w*_*w*)\}?", template_text))
         solvent_type = search(r'"solventType" : "(.*)",', template_text)
+    keywords_values = {}
+    if args.receptor:
+        for k in keywords_in_the_template:
+            if search(".*constraints", k, IGNORECASE) :
+                if args.debug:
+                    print "file4pele: ", processed_receptor_filename
+                constraints = obtain_constraints_from_pdb(processed_receptor_filename, args.every, args.constraint,
+                                                          args.atoms2conStraint)
+                if not constraints:
+                    print "Couldn't generate the constraints for file {}".format(processed_receptor_filename)
+                    logging.error("  ERROR: Couldn't generate the constraints for file {}"
+                                  "".format(processed_receptor_filename))
+                    logging.info(" The program won't be executed because the constraints for the receptor {0} couldn't "
+                                 "be generated".format(processed_receptor_filename))
+                    errors_counter += 1
+                    logging.critical("No constraints for the receptor.")
+                    sys.exit("Terminating the program.")
+            # obtain constraints from a pdb file
+            keywords_values[k] = constraints
     if solvent_type is None:
         logging.critical("ERROR: The template doesn't specify the solvent type PELE won't work.")
         logging.info("Terminating the program")
@@ -638,8 +665,32 @@ for filename in input_files:
     # If no receptor is specified the program assumes the original file is a complex and will try to generate
     # a _receptor.pdb file and a _ligand.pdb file extracting the chain Z from the original file.
     if args.no_templates:
+        print 'eeoo'
         no_need4template = True
-        complex_filename = glob(new_general_subfolder + "*_complex_processed.pdb")[0]
+        complex_existing_file = new_general_subfolder + "*{0}_complex_processed.pdb".format(args.complex_subfix)
+        complex_filename = glob(complex_existing_file)
+        if complex_filename:
+            complex_filename = complex_filename[0]
+        else:
+            logging.info(" - The file {0} doesn't exist. It'll be generated now.".format(complex_existing_file))
+            ligand_filename = file_copy
+            no_need4template = check_ligand(ligand_filename)
+            complex_text = receptor_text
+            with open(ligand_filename, 'r') as ligand_file:
+                for line in ligand_file:
+                    if line.startswith("ATOM") or line.startswith("HETATM") or line.startswith("TER"):
+                        complex_text += line
+            if complex_text:
+                complex_filename = new_general_subfolder + new_folder_name + "{0}_complex.pdb".format(args.complex_subfix)
+                with open(complex_filename, 'w') as complex_file:
+                    complex_file.write(complex_text)
+            else:
+                # If the code gets here is due to the fact that the receptor and the ligand files are empty so
+                # it shouldn't continue.
+                logging.critical("There's a problem in the code, tell the developer code L446")
+                logging.shutdown()
+                print "BU!! NOT WORKING!"  # TODO:Change this message to something more serious
+                sys.exit("See what's happening..LINE 667 ")
         existing_templates = glob(hetero_folder + "???z")
         if existing_templates:
             ligand_template_filename = existing_templates[0]
@@ -668,7 +719,7 @@ for filename in input_files:
                 logging.critical("There's a problem in the code, tell the developer code L446")
                 logging.shutdown()
                 print "BU!! NOT WORKING!"  # TODO:Change this message to something more serious
-                sys.exit("See what's happening..LINE 277 ")
+                sys.exit("See what's happening..LINE 696 ")
         else:
             # The program assumes that if the initial structure is a complex it will have only on copy of the ligand
             # in chain Z.
@@ -706,24 +757,24 @@ for filename in input_files:
 
         # block calling the mutations program to generate the preprocessed
         # .pdb file
-        logging.info(" - Calling the 'mutations_program.py' to format the complex file.")
-        command2call = mutations_program_command.format(complex_filename)
-        file_preparation_output = check_output(command2call.split(), stderr=STDOUT)
+        # logging.info(" - Calling the 'mutations_program.py' to format the complex file.")
+        # command2call = mutations_program_command.format(complex_filename)
+        # file_preparation_output = check_output(command2call.split(), stderr=STDOUT)
         # We want to use the file generated by the mutations program since it will have the correct format for PELE.
-        if "Writing the structure to" not in file_preparation_output:
-            error_filename = new_general_subfolder + new_folder_name + "_preparation_error_log.txt"
-            logging.error(
-                " - ERROR: The mutations program hasn't been able to prepare the complex file for the file.\n"
-                "   More information about this error in the file {}".format(error_filename))
-            errors_counter += 1
-            with open(error_filename, 'w') as error_file:
-                error_file.write(file_preparation_output)
-            complex_filename = complex_filename.split('/')[-1]
-            logging.info(" - The original complex will be used: {}".format(complex_filename))
-            continue
-        else:
-            complex_filename = complex_filename.split('.pdb')[0] + "_processed.pdb"
-            logging.info(" - The file ready for pele it's called: {}".format(complex_filename))
+        # if "Writing the structure to" not in file_preparation_output:
+        #     error_filename = new_general_subfolder + new_folder_name + "_preparation_error_log.txt"
+        #     logging.error(
+        #         " - ERROR: The mutations program hasn't been able to prepare the complex file for the file.\n"
+        #         "   More information about this error in the file {}".format(error_filename))
+        #     errors_counter += 1
+        #     with open(error_filename, 'w') as error_file:
+        #         error_file.write(file_preparation_output)
+        #     complex_filename = complex_filename.split('/')[-1]
+        #     logging.info(" - The original complex will be used: {}".format(complex_filename))
+        #     continue
+        # else:
+        #     complex_filename = complex_filename.split('.pdb')[0] + "_processed.pdb"
+        #     logging.info(" - The file ready for pele it's called: {}".format(complex_filename))
             # The configuration file and this file will be in the same folder thus we just need the name of
             # the complex and not the whole path.
         if ".pdb" not in ligand_filename:
@@ -734,6 +785,7 @@ for filename in input_files:
             # Now that we've made sure the ligand is in chain Z and it has a normal name or LIG as the residue name
             # we convert it to .mae format, so we can create the template. Unless the ligand it's a peptide in
             # which case we don't need to generate a template.
+
     if not no_need4template:
         ligand_template_filename = create_template_and_rotamerlib(ligand_filename, hetero_folder, rotamerlibs_folder,
                                                                   command_first_execution['ploprottemp'])
@@ -808,7 +860,8 @@ for filename in input_files:
             print e
             sys.exit("Error when creating the configuration file, missing keywords.")
         else:
-            new_conf_file_filename = new_general_subfolder + new_folder_name + "_{0}".format(solvent_type) + ".conf"
+            new_conf_file_filename = new_general_subfolder + new_folder_name + "{0}_{1}.conf".format(
+                args.complex_subfix, solvent_type)
             with open(new_conf_file_filename, 'w') as new_conf_file:
                 new_conf_file.write(new_conf_file_text)
         configuration_files_names.append(new_conf_file_filename)
