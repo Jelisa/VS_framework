@@ -24,17 +24,14 @@ email: jelisa.iglesias@gmail.com
 import argparse
 import re
 import os
-import shutil
 import sys
 from string import Template
-from subprocess import check_output, STDOUT, CalledProcessError, check_call
+from subprocess32 import check_output, STDOUT, CalledProcessError, check_call, TimeoutExpired
 import logging
 import datetime
-from glob import glob
-import pybel as py
 
 import external_software_paths
-# import modules  # This is for AZ.
+import modules  # This is for AZ.
 
 
 def extract_ligand(pdb_filename, general_name, ligand_chain, executing_folder):
@@ -46,7 +43,7 @@ def extract_ligand(pdb_filename, general_name, ligand_chain, executing_folder):
     :return:
     :param executing_folder:
     """
-    receptor_with_waters_text = ""
+    # receptor_with_waters_text = ""
     receptor_text = ""
     waters_text = ""
     ligand_text = ""
@@ -59,13 +56,13 @@ def extract_ligand(pdb_filename, general_name, ligand_chain, executing_folder):
                 else:
                     if line[17:20] == "HOH":
                         waters_text += line
-                        receptor_with_waters_text += line
+                        # receptor_with_waters_text += line
                     else:
                         receptor_text += line
     if ligand_text == "":
         print "Something went wrong when extracting the ligand."
         return False
-    elif receptor_text == "" and receptor_with_waters_text == "":
+    elif receptor_text == "":
         print "Something went wrong when extracting the receptor."
         return False
     else:
@@ -78,7 +75,7 @@ def extract_ligand(pdb_filename, general_name, ligand_chain, executing_folder):
             waters_file.write(waters_text)
         receptor_with_waters_filename = general_name + "_protein.pdb"
         with open(executing_folder + receptor_with_waters_filename, 'w') as receptor_with_waters_file:
-            receptor_with_waters_file.write(receptor_with_waters_text)
+            receptor_with_waters_file.write(receptor_text + waters_text)
         receptor_no_waters_filename = general_name + "_receptor_no_waters.pdb"
         with open(executing_folder + receptor_no_waters_filename, 'w') as receptor_file:
             receptor_file.write(receptor_text)
@@ -303,8 +300,9 @@ def xscore_execution(receptor_filename, ligand_filename, execution_folder):
     xscore_command = "xscore -score {0} {1}".format(receptor_filename, ligand_filename)
     try:
         xscore_output = check_output(xscore_command.split(), cwd=execution_folder, stderr=STDOUT)
-    except CalledProcessError as e:
+    except (CalledProcessError, OSError) as e:
         if first_time_execution["xscore"]:
+            print execution_folder
             command_execution_failed(xscore_command, e)
         else:
             logging.info(" - Error while computing Xscore.")
@@ -343,15 +341,20 @@ def binana_execution(receptor_filename, ligand_filename, execution_folder):
 def mmgbsa_execution(complex_filename, execution_folder, host, number_cpus, lig_chain):
     if args.debug:
         print "Executing mmgbsa"
-    mmgbsa_command = "{0}prime_mmgbsa;{1};-csv;yes;-ligand;'chain.name  {4} ';" \
+    mmgbsa_command = "prime_mmgbsa;{1};-csv;yes;-ligand;'chain.name  {4} ';" \
                      "-HOST;{2}:{3};-WAIT".format(external_software_paths.schrodinger_path,
                                                    complex_filename, host, number_cpus, lig_chain)
     if args.debug:
         print mmgbsa_command.split(';')
     try:
-        check_call(mmgbsa_command.split(';'), cwd=execution_folder)
+        check_call(mmgbsa_command.split(';'), cwd=execution_folder, timeout=7200)
     except CalledProcessError as e:
-        command_execution_failed(mmgbsa_command.replace(";", " "), e)
+        if first_time_execution['mmgbsa']:
+            command_execution_failed(mmgbsa_command.replace(";", " "), e)
+        else:
+            logging.info(" - Error while computing mmgbsa.")
+    except TimeoutExpired as e:
+        logging.info(" - mmgbsa execution takes more than 2 hours for this system, it won't be computed.")
 
 
 parser = argparse.ArgumentParser()
@@ -544,6 +547,8 @@ for filename in args.input_files:
     # created we just need to extract all the files into the same folder as the input file.
 
     working_folder = os.sep.join(filename.split(os.sep)[:-1]) + os.sep
+    if working_folder == os.sep:
+        working_folder = '.' + os.sep
     if glide_subfolder:
         # noinspection PyUnboundLocalVariable
         new_link = glide_structures_subfolder + basic_filename
@@ -552,6 +557,8 @@ for filename in args.input_files:
         except OSError as e:
             if "File exists" not in e[1]:
                 sys.exit(e)
+        else:
+            logging.info(" - linking the structure {0}".format(new_link))
     logging.info(" - Separating ligand and protein")
     try:
         protein_filename_pdb, protein_with_waters_pdb, \
@@ -790,10 +797,10 @@ if glides2compute:
                                                                     args.schrodinger_cpus)
         if args.debug:
             print glide_working_directory
-        try:
-            check_call(glide_command.split(), cwd=glide_working_directory)
-        except CalledProcessError as e:
-            command_execution_failed(glide_command, e)
+        # try:
+        #     check_call(glide_command.split(), cwd=glide_working_directory)
+        # except CalledProcessError as e:
+        #     command_execution_failed(glide_command, e)
 if compute_rf_score:
     if args.debug:
         print 14
@@ -810,7 +817,7 @@ if compute_rf_score:
     rf_command = rf_descriptors_commands.format(rf_output_filename, rf_descriptors_output_filename)
     try:
         rf_output = check_output(rf_command.split())
-    except CalledProcessError as e:
+    except (CalledProcessError, OSError )as e:
         command_execution_failed(rf_command, e)
     else:
         if "Filename" not in rf_output:
