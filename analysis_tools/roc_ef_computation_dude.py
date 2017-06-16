@@ -61,31 +61,31 @@ def compute_enrichment_factor(ordered_list, thresholds_2_use, actives, boolean_v
     return enrichment_factor
 
 
-def plot_all_sfs(if_df, columns2study, subfix, ef_thresholds, gen_title):
+def plot_all_sfs(df, columns2study, subfix, ef_thresholds, gen_title):
     roc_values = {}
     ef_dictionary = {}
     # Plot the image with all the SFs.
     title = "{0} {1} {2}".format(gen_title, "All SFS", subfix)
     fig, ax = pl.subplots()
     color = pl.cm.rainbow(np.linspace(0, 1, len(columns2study)))
-    number_of_m = if_df.shape[0]
-    number_of_actives = if_df['activity'].nonzero()[0].shape[0]
+    number_of_m = df.shape[0]
+    number_of_actives = df['activity'].nonzero()[0].shape[0]
     number_of_inactives = number_of_m - number_of_actives
-    if if_df['activity'].isin([0, 1]).shape == if_df['activity'].shape:
+    if df['activity'].isin([0, 1]).shape == df['activity'].shape:
         boolean_matrix = True
     else:
         boolean_matrix = False
-    if_df.sort_values(["activity"], inplace=True, ascending=False)
-    ef_dictionary["Exp_energy"] = compute_enrichment_factor(if_df['activity'], ef_thresholds,
+    df.sort_values(["activity"], inplace=True, ascending=False)
+    ef_dictionary["Exp_energy"] = compute_enrichment_factor(df['activity'], ef_thresholds,
                                                             number_of_actives, boolean_matrix)
     for score, c in zip(columns2study, color):
-        if_df.sort_values([score], inplace=True)
-        compound_names = list(if_df['name'])
-        sim_id = list(if_df['ID'])
-        activities = list(if_df['activity'])
-        tpr, fpr, auc_val = compute_roc(if_df['activity'].values, number_of_actives, number_of_inactives)
+        df.sort_values([score], inplace=True)
+        compound_names = list(df['name'])
+        sim_id = list(df['ID'])
+        activities = list(df['activity'])
+        tpr, fpr, auc_val = compute_roc(df['activity'].values, number_of_actives, number_of_inactives)
         roc_values[score] = [sim_id, activities, compound_names, fpr, tpr, auc_val]
-        efs = compute_enrichment_factor(if_df['activity'], ef_thresholds, number_of_actives, boolean_matrix)
+        efs = compute_enrichment_factor(df['activity'], ef_thresholds, number_of_actives, boolean_matrix)
         ef_dictionary[score] = efs
         ax.plot(fpr, tpr, label='{0} ROC curve (area = {1:0.2f})'.format(score, auc_val), c=c)
     ax.plot([0, 1], [0, 1], color='navy', linestyle='--', label="Random selection")
@@ -138,6 +138,7 @@ parser.add_argument("-ef_thresholds", default=[10, 20, 50, 100, 250, 500], type=
 parser.add_argument("-output_folder", default=".")
 parser.add_argument("-systems2use1", default=False)
 parser.add_argument("-systems2use0", default=False)
+parser.add_argument('-debug')
 args = parser.parse_args()
 
 fig_size = pl.rcParams["figure.figsize"]
@@ -161,25 +162,36 @@ if_sfs_df = pd.read_csv(args.all_sfs_file)
 ids2select_df = None
 ids2select_df0 = None
 if args.systems2use1:
+    # print 0
     ids2select_df = pd.read_csv(args.systems2use1)
     if_sfs_df = if_sfs_df.loc[if_sfs_df['ID'].isin(ids2select_df['ID'])]
     ids2select_df0 = ids2select_df
 if args.systems2use0:
+    # print 1
     ids2select_df0 = pd.read_csv(args.systems2use0)
-
+# print 2
+# print if_sfs_df[:5]['HMScore']
 if "Exp_energy" in if_sfs_df.columns:
+    if args.debug:
+
+        print 'a'
     if_df = if_sfs_df.merge(name_sim_activity_df[['sim_id', 'name']], left_on="ID", right_on="sim_id")
     if_df.rename(columns={"Exp_energy": "activity"}, inplace=True)
 else:
+    if args.debug:
+        print 'b'
     if_df = if_sfs_df.merge(name_sim_activity_df[['sim_id', 'name', "activity"]], left_on="ID", right_on="sim_id")
 if_df.drop(['sim_id'], axis=1, inplace=True)
+# print if_df[:5]['HMScore']
 
 scores1 = [score for score in if_df.columns if score not in ["ID", "activity", "name"]]
 roc_values1, ef_dictionary1 = plot_all_sfs(if_df, scores1, 'if', args.ef_thresholds, args.general_title)
 write_roc_files(roc_values1, args.output_prefix + "_if")
 # print ef_dictionary1.keys()
 write_ef_files(ef_dictionary1, args.output_prefix + "_if")
-
+if args.debug:
+    print 4, roc_values1['HMScore'][0][:5]
+    print 5, roc_values1['HMScore'][3][:5]
 if args.previous_scoring_functions_file:
     ini_sfs_df = pd.read_csv(args.previous_scoring_functions_file)
     if ids2select_df0 is not None:
@@ -188,24 +200,32 @@ if args.previous_scoring_functions_file:
         ini_df = ini_sfs_df.merge(name_sim_activity_df[['sim_id', 'name']], left_on="ID", right_on="sim_id")
         ini_df.rename(columns={"Exp_energy": "activity"}, inplace=True)
     else:
-        ini_df = if_sfs_df.merge(name_sim_activity_df[['sim_id', 'name', "activity"]], left_on="ID", right_on="sim_id")
+        ini_df = ini_sfs_df.merge(name_sim_activity_df[['sim_id', 'name', "activity"]], left_on="ID", right_on="sim_id")
     ini_df.drop(['sim_id'], axis=1, inplace=True)
-    print ini_df.shape
+    if args.debug:
+        print ini_df.shape
     scores0 = [score for score in ini_df.columns if score not in ["ID", "activity", "name"]]
     roc_values0, ef_dictionary0 = plot_all_sfs(ini_df, scores0, 'init', args.ef_thresholds, args.general_title)
+    if args.debug:
+        print 9, roc_values0['HMScore'][3][:5]
     write_roc_files(roc_values0, args.output_prefix + "_init")
     write_ef_files(ef_dictionary0, args.output_prefix + "_init")
     common_scores = set.intersection(set(scores1), set(scores0))
-    for score in common_scores:
+    if args.debug:
+        print 3, common_scores
+    for score in sorted(common_scores):
         title = "{0}  (SF:{1} comparison) ".format(args.general_title, score)
         fig_tmp, ax_tmp = pl.subplots()
-        print score,
-        # print roc_values0
-        sim_ids1, activities1, names1, fpr0, tpr0, auc_val0 = roc_values0[score]
-        sim_ids0, activities0, names0, fpr1, tpr1, auc_val1 = roc_values1[score]
+        sim_ids1, activities1, names1, fpr1, tpr1, auc_val1 = roc_values1[score]
+        if args.debug:
+            print 6, sim_ids1[:5]
+            print 7, fpr1[:5]
+        sim_ids0, activities0, names0, fpr0, tpr0, auc_val0 = roc_values0[score]
+        if args.debug:
+            print 8, fpr0[:5]
         ax_tmp.plot(fpr0, tpr0, label='initial {0} ROC curve (area = {1:0.2f})'.format(score, auc_val0), c='r')
         ax_tmp.plot(fpr1, tpr1, label='i.f. {0} ROC curve (area = {1:0.2f})'.format(score, auc_val1), c='b')
-        print "delta auc: {0:6.4}".format(auc_val1 - auc_val0)
+        print "{1} delta auc: {0:6.4}".format( auc_val1 - auc_val0, score)
         ax_tmp.plot([0, 1], [0, 1], color='navy', linestyle='--', label="Random selection")
         ax_tmp.legend(loc="lower right")
         ax_tmp.set_ylim([0, 1])
@@ -220,4 +240,3 @@ if args.previous_scoring_functions_file:
                 for score in common_scores}
     # print delta_ef.keys()
     write_ef_files(delta_ef, args.output_prefix + "_delta")
-
