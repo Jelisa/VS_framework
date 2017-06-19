@@ -159,21 +159,24 @@ if args.output_folder != "'.":
 name_sim_activity_df = pd.read_csv(args.activities_file)
 
 if_sfs_df = pd.read_csv(args.all_sfs_file)
-ids2select_df = None
+ids2select_df1 = None
 ids2select_df0 = None
+compounds = None
 if args.systems2use1:
     # print 0
-    ids2select_df = pd.read_csv(args.systems2use1)
-    if_sfs_df = if_sfs_df.loc[if_sfs_df['ID'].isin(ids2select_df['ID'])]
-    ids2select_df0 = ids2select_df
+    ids2select_df1 = pd.read_csv(args.systems2use1)
+    if_sfs_df = if_sfs_df.loc[if_sfs_df['ID'].isin(ids2select_df1['ID'])]
+    ids2select_df0 = ids2select_df1
+    compounds = name_sim_activity_df['name'].loc[name_sim_activity_df['sim_id'].isin(ids2select_df1['ID'])]
 if args.systems2use0:
     # print 1
     ids2select_df0 = pd.read_csv(args.systems2use0)
+    if len(ids2select_df1) > len(ids2select_df0):
+        compounds = name_sim_activity_df.loc[name_sim_activity_df['sim_id'].isin(ids2select_df0['ID'])]
 # print 2
 # print if_sfs_df[:5]['HMScore']
 if "Exp_energy" in if_sfs_df.columns:
     if args.debug:
-
         print 'a'
     if_df = if_sfs_df.merge(name_sim_activity_df[['sim_id', 'name']], left_on="ID", right_on="sim_id")
     if_df.rename(columns={"Exp_energy": "activity"}, inplace=True)
@@ -183,8 +186,11 @@ else:
     if_df = if_sfs_df.merge(name_sim_activity_df[['sim_id', 'name', "activity"]], left_on="ID", right_on="sim_id")
 if_df.drop(['sim_id'], axis=1, inplace=True)
 # print if_df[:5]['HMScore']
+if compounds is not None:
+    if_df = if_df.loc[if_df['name'].isin(compounds)]
 
 scores1 = [score for score in if_df.columns if score not in ["ID", "activity", "name"]]
+print if_df.shape, if_sfs_df.shape
 roc_values1, ef_dictionary1 = plot_all_sfs(if_df, scores1, 'if', args.ef_thresholds, args.general_title)
 write_roc_files(roc_values1, args.output_prefix + "_if")
 # print ef_dictionary1.keys()
@@ -202,6 +208,8 @@ if args.previous_scoring_functions_file:
     else:
         ini_df = ini_sfs_df.merge(name_sim_activity_df[['sim_id', 'name', "activity"]], left_on="ID", right_on="sim_id")
     ini_df.drop(['sim_id'], axis=1, inplace=True)
+    if compounds is not None:
+        ini_df = ini_df.loc[ini_df['name'].isin(compounds)]
     if args.debug:
         print ini_df.shape
     scores0 = [score for score in ini_df.columns if score not in ["ID", "activity", "name"]]
