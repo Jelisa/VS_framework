@@ -165,6 +165,7 @@ compounds = None
 if args.systems2use1:
     # print 0
     ids2select_df1 = pd.read_csv(args.systems2use1)
+    # print ids2select_df1
     if_sfs_df = if_sfs_df.loc[if_sfs_df['ID'].isin(ids2select_df1['ID'])]
     ids2select_df0 = ids2select_df1
     compounds = name_sim_activity_df['name'].loc[name_sim_activity_df['sim_id'].isin(ids2select_df1['ID'])]
@@ -188,9 +189,12 @@ if_df.drop(['sim_id'], axis=1, inplace=True)
 # print if_df[:5]['HMScore']
 if compounds is not None:
     if_df = if_df.loc[if_df['name'].isin(compounds)]
+    if len(if_df) < len(compounds):
+        compounds = if_df['name']
 
 scores1 = [score for score in if_df.columns if score not in ["ID", "activity", "name"]]
-print if_df.shape, if_sfs_df.shape
+if args.debug:
+    print if_df.shape, if_sfs_df.shape
 roc_values1, ef_dictionary1 = plot_all_sfs(if_df, scores1, 'if', args.ef_thresholds, args.general_title)
 write_roc_files(roc_values1, args.output_prefix + "_if")
 # print ef_dictionary1.keys()
