@@ -235,8 +235,8 @@ if args.previous_scoring_functions_file:
         sim_ids0, activities0, names0, fpr0, tpr0, auc_val0 = roc_values0[score]
         if args.debug:
             print 8, fpr0[:5]
-        ax_tmp.plot(fpr0, tpr0, label='initial {0} ROC curve (area = {1:0.2f})'.format(score, auc_val0), c='r')
-        ax_tmp.plot(fpr1, tpr1, label='i.f. {0} ROC curve (area = {1:0.2f})'.format(score, auc_val1), c='b')
+        ax_tmp.plot(fpr0, tpr0, label='initial {0} ROC curve (area = {1:0.2f})'.format(score, auc_val0), c='b')
+        ax_tmp.plot(fpr1, tpr1, label='i.f. {0} ROC curve (area = {1:0.2f})'.format(score, auc_val1), c='r')
         print "{1} delta auc: {0:6.4}".format( auc_val1 - auc_val0, score)
         ax_tmp.plot([0, 1], [0, 1], color='navy', linestyle='--', label="Random selection")
         ax_tmp.legend(loc="lower right")
