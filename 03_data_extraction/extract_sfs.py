@@ -32,6 +32,14 @@ import extract_sf_help
 
 
 def binana_extraction(filename, ensemble_flag):
+    """
+    A function to read and parse the binana output file to extract the information present on it
+    :param filename: a string containing the name of the binana file to parse.
+    :param ensemble_flag: a boolean indicating whether to use the patterns
+    for names coming from an ensemble selection of structures or not
+    :return: either a False value or two elements: a string containing the file name and
+    a dictionary containing all the extracted values.
+    """
     system_id = filename.split('/')[-1]
     filein = open(filename, 'r')
     file_lines = filein.readlines()
@@ -762,6 +770,13 @@ if args.pele_file:
         logging.warning(" # WARNING: The file {0} doesn't exist. It'll be skipped.".format(args.pele_file))
     else:
         scoring_functions["pele"] = parse_csv_file(args.pele_file, args.ensemble)
+
+if args.pele_mean_file:
+    logging.info("Extracting mean pele score")
+    if not os.path.isfile(args.pele_mean_file):
+        logging.warning(" # WARNING: The file {0} doesn't exist. It'll be skipped.".format(args.pele_mean_file))
+    else:
+        scoring_functions["pele_mean"] = parse_csv_file(args.pele_mean_file, args.ensemble)
 
 if args.glide_ranking_csv_file:
     if not (os.path.isfile(args.glide_ranking_csv_file[0]) or os.path.isfile(args.glide_ranking_csv_file[1])):
