@@ -124,7 +124,17 @@ def create_template_and_rotamerlib(initial_pdb, template_folder, rotamer_library
     return template_filename
 
 
-def split_complex(filename, warnings):
+def split_complex(filename, ligand_chain, warnings):
+    """
+    This function reads a .pdb file and extracts whatever forms the chain
+    specified by the ligand_chain argument, it should be the one where the ligand
+    is present and it should not contain anything else.
+    :param ligand_chain: a sting containing the name of the chain to look for
+    :param filename: a string containing the path to the file to read.
+    :param warnings: a counter of the warnings produced in the program
+    :return: the name of the file containing the extracted ligand and the
+    warnings counter updated.
+    """
     with open(filename, 'r') as complex_text:
         ligand = ""
         receptor = ""
@@ -132,7 +142,7 @@ def split_complex(filename, warnings):
             if args.debug:
                 print filename
             if "ATOM" in line or "HETATM" in line:
-                if line[21] in [args.ligand_chain.upper(), args.ligand_chain.lower()]:
+                if line[21] in [ligand_chain.upper(), ligand_chain.lower()]:
                     ligand += line
             elif line == "TER\n" and ligand:
                 ligand += line
@@ -141,7 +151,6 @@ def split_complex(filename, warnings):
     if ligand:
         logging.info(" - Extracting the ligand from the complex.")
         new_ligand_filename = new_general_subfolder + new_folder_name + "_ligand.pdb"
-        new_complex_filename = filename
         with open(new_ligand_filename, 'w') as new_ligand_file:
             new_ligand_file.write(ligand)
             # In this case we don't really need the receptor in a separated file since we already have the complex.
@@ -154,9 +163,8 @@ def split_complex(filename, warnings):
         logging.warning(" -WARNING: The procedure for the folder {} will be interrupted from now on.".format(
             new_general_subfolder))
         warnings += 1
-        new_complex_filename = ""
         new_ligand_filename = ""
-    return new_complex_filename, new_ligand_filename, warnings
+    return new_ligand_filename, warnings
 
 
 def compute_center_of_mass(lig_filename):
@@ -694,9 +702,9 @@ for filename in input_files:
             # file4pele = complex_filename.split('/')
             ligand_filename = file_copy
         else:
-            ligand_filename = file_copy
             complex_filename = check_mutations_program_output(mutations_program_command, file_copy, errors_counter)
-            complex_filename, ligand_filename, warnings_counter = split_complex(complex_filename, warnings_counter)
+            ligand_filename, warnings_counter = split_complex(complex_filename, args.ligand_chain,
+                                                                                warnings_counter)
             if not complex_filename and not ligand_filename:
                 # The error message is generated in the split_complex function
                 continue
@@ -726,7 +734,10 @@ for filename in input_files:
         else:
             if args.debug:
                 print 'here'
-            complex_filename, ligand_filename, warnings_counter = split_complex(file_copy, warnings_counter)
+            complex_filename = file_copy
+            ligand_filename, warnings_counter = split_complex(file_copy,
+                                                              args.ligand_chain,
+                                                              warnings_counter)
             if not complex_filename and not ligand_filename:
                 # The error message is generated in the split_complex function
                 continue
