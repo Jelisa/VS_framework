@@ -42,7 +42,7 @@ def createfolder(folder2create_name):
         else:
             logging.error(" - The folder {0} couldn't be created.".format(folder2create_name))
     else:
-        logging.info("   - Folder created correctly")
+        logging.info("   - Folder {0} created correctly".format(folder2create_name))
 
 
 def createsymboliclink(original, link):
@@ -66,7 +66,7 @@ def createsymboliclink(original, link):
 def create_template_and_rotamerlib(initial_pdb, template_folder, rotamer_library_folder, out):
     ploprottemp_wd = mkdtemp(prefix="plop_exec_")
     ploprottemp_wd += os.sep
-    ligand_filename_mae = ploprottemp_wd +  initial_pdb.split(os.sep)[-1].split(".pdb")[0] + ".mae"
+    ligand_filename_mae = ploprottemp_wd + initial_pdb.split(os.sep)[-1].split(".pdb")[0] + ".mae"
     command2call2 = schrodinger_pdb2mae_convert_command.format(initial_pdb, ligand_filename_mae)
     try:
         check_call(command2call2.split())
@@ -122,6 +122,41 @@ def create_template_and_rotamerlib(initial_pdb, template_folder, rotamer_library
                     move(initial_name_rotlib, destination_file)
     rmtree(ploprottemp_wd)
     return template_filename
+
+
+def split_complex(filename, warnings):
+    with open(filename, 'r') as complex_text:
+        ligand = ""
+        receptor = ""
+        for line in complex_text:
+            if args.debug:
+                print filename
+            if "ATOM" in line or "HETATM" in line:
+                if line[21] in [args.ligand_chain.upper(), args.ligand_chain.lower()]:
+                    ligand += line
+            elif line == "TER\n" and ligand:
+                ligand += line
+            else:
+                receptor += line
+    if ligand:
+        logging.info(" - Extracting the ligand from the complex.")
+        new_ligand_filename = new_general_subfolder + new_folder_name + "_ligand.pdb"
+        new_complex_filename = filename
+        with open(new_ligand_filename, 'w') as new_ligand_file:
+            new_ligand_file.write(ligand)
+            # In this case we don't really need the receptor in a separated file since we already have the complex.
+            # receptor_filename = new_general_subfolder + new_folder_name + "_receptor.pdb"
+            # with open(receptor_filename, 'w') as receptor_file:
+            #     receptor_file.write(receptor)
+    else:
+        # If the program hasn't found the ligand chain it won't generate the files
+        logging.info(" - There's nothing in chain Z for the file {}.".format(filename))
+        logging.warning(" -WARNING: The procedure for the folder {} will be interrupted from now on.".format(
+            new_general_subfolder))
+        warnings += 1
+        new_complex_filename = ""
+        new_ligand_filename = ""
+    return new_complex_filename, new_ligand_filename, warnings
 
 
 def compute_center_of_mass(lig_filename):
@@ -239,7 +274,7 @@ def obtain_constraints_from_pdb(pdb_filename, every, constraint, atoms2restrain)
         return constraints_text
 
 
-def obtain_current_values(template_keywords, complex_complete_path, warnings, errors):
+def obtain_current_values(template_keywords, complex_complete_path, warnings, errors, ligand_complete_path):
     keywords_values = {}
     for keyword in template_keywords:
         if search(".*constraints", keyword, IGNORECASE):
@@ -256,7 +291,7 @@ def obtain_current_values(template_keywords, complex_complete_path, warnings, er
             # obtain constraints from a pdb file
             keywords_values[keyword] = constraints
         elif search("center_*of_*mass", keyword, IGNORECASE):
-            mass_center = compute_center_of_mass(ligand_filename)
+            mass_center = compute_center_of_mass(ligand_complete_path)
             if not mass_center:
                 logging.warning("  WARNING: This system will be discontinued. Couldn't compute the center of mass.")
                 logging.info("INFO: to solve this problem talk with he developer and provide the ligand file.")
@@ -346,10 +381,14 @@ def check_mutations_program_output(command, filename, errors_counter):
 
 
 parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
-parser.add_argument("-input_files", "-input", required=True, nargs="+", help=help_descriptions.input_files_desc)
-parser.add_argument("-receptor", default="", help=help_descriptions.receptor_desc)
-parser.add_argument("-subfolders_path", default=".", help=help_descriptions.subfolder_path_desc)
-parser.add_argument("-log_file", default="log.txt", help=help_descriptions.log_file_desc)
+parser.add_argument("-input_files", "-input", required=True, nargs="+",
+                    help=help_descriptions.input_files_desc)
+parser.add_argument("-receptor", default=enviroment_parameters.receptor_file_default,
+                    help=help_descriptions.receptor_desc)
+parser.add_argument("-subfolders_path", default=enviroment_parameters.subfolders_path_default,
+                    help=help_descriptions.subfolder_path_desc)
+parser.add_argument("-log_file", default=enviroment_parameters.log_file_default,
+                    help=help_descriptions.log_file_desc)
 parser.add_argument("-pele_folders", default=enviroment_parameters.pele_folders,
                     help=help_descriptions.pele_folder_desc)
 parser.add_argument("-debug", action="store_true", help=help_descriptions.debug_desc)
@@ -366,8 +405,8 @@ parser.add_argument("-every", "-fix_every_x_atoms", default=enviroment_parameter
                     type=int, help=help_descriptions.every_desc)
 parser.add_argument("-constraint", "-constraint_strength", default=enviroment_parameters.constraints_strength,
                     help=help_descriptions.constraint_desc)
-parser.add_argument("-atoms2conStraint", default=enviroment_parameters.atoms2apply_constraints_default, nargs='+',
-                    help=help_descriptions.atoms2constraint_desc)
+parser.add_argument("-atoms2conStraint", default=enviroment_parameters.atoms2apply_constraints_default,
+                    nargs='+', help=help_descriptions.atoms2constraint_desc)
 parser.add_argument("-mutations_program_path", default=enviroment_parameters.mutations_program_path,
                     help=help_descriptions.mutations_program_path_desc)
 parser.add_argument("-obc_param_generator", default=enviroment_parameters.obc_param_generator_path,
@@ -414,7 +453,7 @@ obc_param_generator = "python {}".format(args.obc_param_generator)
 obc_param_command = obc_param_generator + " {}"
 
 command_first_execution = {"ploprottemp": True, 'mae2pdb_convert': True, 'pdb2mae_convert': True,
-                          'mutations_program': True, 'obc_param_gen': True}
+                           'mutations_program': True, 'obc_param_gen': True}
 
 # Set up a counter for non-critical errors and warnings to do a simple summary in the log file.
 errors_counter = 0
@@ -497,7 +536,7 @@ if args.receptor:
             # This shouldn't happen ever since a similar pattern has been checked previously...
             logging.critical("There's a problem in the code, tell the developer code L281")
             logging.shutdown()
-            sys.exit("You got somewhere where it should be impossible to get. Code Line 116")
+            sys.exit("You got somewhere where it should be impossible to get. Code L281")
         else:
             new_receptor_name = "{0}_1{1}".format(pattern4new_receptor.group(1), pattern4new_receptor.group(2))
             receptor_copy = new_receptor_name
@@ -506,9 +545,9 @@ if args.receptor:
     copyfile(args.receptor, receptor_copy)
     receptor_filename = receptor_copy
 
-    #TODO: clean the original lines for this part!!
     logging.info(" - Calling the 'mutations_program.py' to format the receptor file.")
-    processed_receptor_filename = check_mutations_program_output(mutations_program_command_receptor, receptor_copy, errors_counter)
+    processed_receptor_filename = check_mutations_program_output(mutations_program_command_receptor,
+                                                                 receptor_copy, errors_counter)
     if not processed_receptor_filename:
         logging.critical("")
         logging.shutdown()
@@ -553,7 +592,7 @@ else:
 # Check the configuration file template to look for the parameters to generate.
 if search("none", args.conf_template, IGNORECASE) is None:
     with open(args.conf_template, 'r') as template_file:
-        logging.info(" - Creating the Templates.")
+        logging.info(" - Creating the configuration file Template.")
         template_text = "".join(template_file.readlines())
         keywords_in_the_template = set(pattern.group(1) for pattern in finditer("\$\{*(\w*_*w*)\}?", template_text))
         solvent_type = search(r'"solventType" : "(.*)",', template_text)
@@ -587,11 +626,10 @@ for filename in input_files:
     exists_already = False
     # The next step is to create a folder for each file, these subfolders will be generated in the
     # directory specified by the option subfolder_path and copy the file.
-    logging.info(" - Creating the folder {}".format(new_general_subfolder))
+    # logging.info(" - Creating the folder {}".format(new_general_subfolder))
     createfolder(new_general_subfolder)
     # This block also generates all the folders and links needed to launch a PELE simulations
     # in the new folders. If the folders exist from previous runs they'll be kept
-    logging.info(" - Creating the subfolder DataLocal and all its subfolders.")
     datalocal_folder = new_general_subfolder + "DataLocal" + os.sep
     rotamerlibs_folder = datalocal_folder + "LigandRotamerLibs" + os.sep
     templates_folder = datalocal_folder + "Templates" + os.sep
@@ -603,7 +641,10 @@ for filename in input_files:
     pele_documents = args.pele_folders + os.sep + "Documents"
     link2documents = new_general_subfolder + "Documents"
     createfolder(output_folder)
-    if not args.no_templates:
+    if args.no_templates:
+        logging.info(" - The option no_templates has been chosen, the program will assume they already exist.")
+    else:
+        logging.info(" - Creating the subfolder DataLocal and all its subfolders.")
         createfolder(datalocal_folder)
         createfolder(rotamerlibs_folder)
         createfolder(templates_folder)
@@ -639,17 +680,30 @@ for filename in input_files:
     # a _receptor.pdb file and a _ligand.pdb file extracting the chain Z from the original file.
     if args.no_templates:
         no_need4template = True
-        complex_filename = glob(new_general_subfolder + "*_complex_processed.pdb")[0]
         existing_templates = glob(hetero_folder + "???z")
         if existing_templates:
             ligand_template_filename = existing_templates[0]
         else:
-            logging.warning("WARNING: There are no pre-existing templates for this system so it will be discontinues.")
+            logging.warning("WARNING: There are no pre-existing templates "
+                            "for this system so it will be discontinues.")
             warnings_counter += 1
             continue
-        ligand_filename = file_copy
+        # print new_general_subfolder+ "*_complex_processed.pdb"
+        if form_complexes:
+            complex_filename = glob(new_general_subfolder + "*_complex_processed.pdb")[0]
+            # file4pele = complex_filename.split('/')
+            ligand_filename = file_copy
+        else:
+            ligand_filename = file_copy
+            complex_filename = check_mutations_program_output(mutations_program_command, file_copy, errors_counter)
+            complex_filename, ligand_filename, warnings_counter = split_complex(complex_filename, warnings_counter)
+            if not complex_filename and not ligand_filename:
+                # The error message is generated in the split_complex function
+                continue
     else:
         if form_complexes:
+            if args.debug:
+                print 0, 'uuppss'
             ligand_filename = file_copy
             no_need4template = check_ligand(ligand_filename)
             logging.info(" - Generating the complex file.")
@@ -670,37 +724,11 @@ for filename in input_files:
                 print "BU!! NOT WORKING!"  # TODO:Change this message to something more serious
                 sys.exit("See what's happening..LINE 277 ")
         else:
-            # The program assumes that if the initial structure is a complex it will have only on copy of the ligand
-            # in chain Z.
-            with open(file_copy, 'r') as complex_file:
-                ligand = ""
-                receptor = ""
-                for line in complex_file:
-                    if args.debug:
-                        print file_copy
-                    if "ATOM" in line or "HETATM" in line:
-                        if line[21] in [args.ligand_chain.upper(), args.ligand_chain.lower()]:
-                            ligand += line
-                    elif line == "TER\n" and ligand:
-                        ligand += line
-                    else:
-                        receptor += line
-            if ligand:
-                logging.info(" - Extracting the ligand from the complex.")
-                ligand_filename = new_general_subfolder + new_folder_name + "_ligand.pdb"
-                complex_filename = file_copy
-                with open(ligand_filename, 'w') as ligand_file:
-                    ligand_file.write(ligand)
-                    # In this case we don't really need the receptor in a separated file since we already have the complex.
-                    # receptor_filename = new_general_subfolder + new_folder_name + "_receptor.pdb"
-                    # with open(receptor_filename, 'w') as receptor_file:
-                    #     receptor_file.write(receptor)
-            else:
-                # If the program hasn't found the ligand chain it won't generate the files
-                logging.info(" - There's nothing in chain Z for the file {}.".format(file_copy))
-                logging.warning(" -WARNING: The procedure for the folder {} will be interrupted from now on.".format(
-                    new_general_subfolder))
-                warnings_counter += 1
+            if args.debug:
+                print 'here'
+            complex_filename, ligand_filename, warnings_counter = split_complex(file_copy, warnings_counter)
+            if not complex_filename and not ligand_filename:
+                # The error message is generated in the split_complex function
                 continue
             no_need4template = check_ligand(ligand_filename)
 
@@ -790,8 +818,8 @@ for filename in input_files:
     # This block creates the configuration file into the folder.
     if generate_configuration_file_template:
         keywords_values, warnings_counter, errors_counter = obtain_current_values(keywords_in_the_template,
-                                                                                  complex_filename,
-                                                                                  warnings_counter, errors_counter)
+                                                                                  complex_filename, warnings_counter,
+                                                                                  errors_counter, ligand_filename)
         if not keywords_values:
             continue
         template = Template(template_text)
