@@ -32,3 +32,5 @@ ligand_chain_desc = "The chain where the ligand is present. This chain should co
                     "is a peptidic ligand it should be formed by one single residue."
 no_templates = "This option acts as a flag when present the program won't generate the template nor the ligand " \
                "rotamer library."
+adaptive_sampling_desc = "If used, it should specify the path to the templatized control file to be used " \
+                         "to create the control files for the adaptiveSampling.py script."

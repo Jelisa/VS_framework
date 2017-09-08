@@ -100,7 +100,7 @@ def create_template_and_rotamerlib(initial_pdb, template_folder, rotamer_library
         print command2call2
     for name4file in os.listdir(ploprottemp_wd):
         if args.debug:
-                print name4file
+            print name4file
         if fnmatch.fnmatch(name4file, "???"):
             template_filename = template_folder + name4file.split(os.sep)[-1] + "z"
             initial_name_temp = ploprottemp_wd + name4file.split(os.sep)[-1]
@@ -138,12 +138,15 @@ def split_complex(filename, ligand_chain, warnings):
     with open(filename, 'r') as complex_text:
         ligand = ""
         receptor = ""
+        lig_name = ""
         for line in complex_text:
             if args.debug:
                 print filename
             if "ATOM" in line or "HETATM" in line:
                 if line[21] in [ligand_chain.upper(), ligand_chain.lower()]:
                     ligand += line
+                    if "HETATM" in line and not lig_name:
+                        lig_name = line[17:20]
             elif line == "TER\n" and ligand:
                 ligand += line
             else:
@@ -164,7 +167,7 @@ def split_complex(filename, ligand_chain, warnings):
             new_general_subfolder))
         warnings += 1
         new_ligand_filename = ""
-    return new_ligand_filename, warnings
+    return new_ligand_filename, lig_name, warnings
 
 
 def compute_center_of_mass(lig_filename):
@@ -282,10 +285,13 @@ def obtain_constraints_from_pdb(pdb_filename, every, constraint, atoms2restrain)
         return constraints_text
 
 
-def obtain_current_values(template_keywords, complex_complete_path, warnings, errors, ligand_complete_path):
+def generate_pele_conf_values(template_keywords, complex_complete_path, warnings,
+                              errors, ligand_complete_path, adaptive_boolean=False):
     keywords_values = {}
     for keyword in template_keywords:
-        if search(".*constraints", keyword, IGNORECASE):
+        if adaptive_boolean and keyword in enviroment_parameters.adaptive_sampling_keywords:
+            keywords_values[keyword] = "${0}".format(keyword)
+        elif search(".*constraints", keyword, IGNORECASE):
             if args.debug:
                 print "file4pele: ", complex_complete_path
             constraints = obtain_constraints_from_pdb(complex_complete_path, args.every, args.constraint,
@@ -324,8 +330,9 @@ def obtain_current_values(template_keywords, complex_complete_path, warnings, er
     return keywords_values, warnings, errors
 
 
-def check_ligand(lig_filename):
+def check_ligand(lig_filename, ligand_chain):
     changes = False
+    lig_name = ""
     with open(lig_filename, 'r') as lig_file:
         peptidic_ligand = False
         new_lig = ""
@@ -333,12 +340,15 @@ def check_ligand(lig_filename):
             if l.startswith("ATOM"):
                 peptidic_ligand = True
             elif l.startswith("HETATM"):
-                if l[21] != "Z":
+                if not lig_name:
+                    lig_name = l[17:20]
+                if l[21] != ligand_chain:
                     changes = True
-                    l = l[:21] + "Z" + l[22:]
+                    l = l[:21] + ligand_chain + l[22:]
                 if search(r'<.>', l[17:20]) or search(r'UNK', l[17:20]):
                     changes = True
                     l = l[:17] + "LIG" + l[20:]
+                    lig_name = 'LIG'
                 if peptidic_ligand:
                     message = "WARNING: This ligand has peptidic and non peptidic residues. It will be skipped.\n" \
                               "Remember that the peptide-like ligands should be considered as one single ligand, " \
@@ -349,7 +359,6 @@ def check_ligand(lig_filename):
                     continue
             new_lig += l
     if changes:
-        # print new_lig
         with open(lig_filename, 'w') as lig_file:
             lig_file.write(new_lig)
     if args.debug:
@@ -366,7 +375,7 @@ def check_ligand(lig_filename):
         logging.info("Terminating the program.")
         logging.shutdown()
         sys.exit("The program can't execute the mutations_program.py")
-    return peptidic_ligand
+    return peptidic_ligand, lig_name
 
 
 def check_mutations_program_output(command, filename, errors_counter):
@@ -422,7 +431,8 @@ parser.add_argument("-obc_param_generator", default=enviroment_parameters.obc_pa
 parser.add_argument("-ligand_chain", default=enviroment_parameters.ligand_chain,
                     help=help_descriptions.ligand_chain_desc)
 parser.add_argument("-no_templates", action="store_true", help=help_descriptions.no_templates)
-# parser.add_argument("-sub_template", default="./submit_template.sh")
+parser.add_argument("-adaptive_sampling", default=enviroment_parameters.adaptive_sampling_def,
+                    help=help_descriptions.adaptive_sampling_desc)
 args = parser.parse_args()
 
 # The program will always generate a log file.
@@ -456,7 +466,7 @@ mutations_program_command = "python " + args.mutations_program_path + \
                             " -ipdb {} -make_unique Z -gaps_ter "
 
 mutations_program_command_receptor = "python " + args.mutations_program_path + \
-                            " -ipdb {} -gaps_ter "
+                                     " -ipdb {} -gaps_ter "
 obc_param_generator = "python {}".format(args.obc_param_generator)
 obc_param_command = obc_param_generator + " {}"
 
@@ -599,11 +609,13 @@ else:
 
 # Check the configuration file template to look for the parameters to generate.
 if search("none", args.conf_template, IGNORECASE) is None:
+    logging.info(" - Reading the configuration file Template.")
     with open(args.conf_template, 'r') as template_file:
-        logging.info(" - Creating the configuration file Template.")
-        template_text = "".join(template_file.readlines())
-        keywords_in_the_template = set(pattern.group(1) for pattern in finditer("\$\{*(\w*_*w*)\}?", template_text))
-        solvent_type = search(r'"solventType" : "(.*)",', template_text)
+        pele_conf_template_text = "".join(template_file.readlines())
+    keywords_in_the_pele_conf_template = set(pattern.group(1) for pattern in
+                                             finditer("\$\{*(\w*_*w*)\}?", pele_conf_template_text))
+    # print keywords_in_the_template
+    solvent_type = search(r'"solventType" : "(.*)",', pele_conf_template_text)
     if solvent_type is None:
         logging.critical("ERROR: The template doesn't specify the solvent type PELE won't work.")
         logging.info("Terminating the program")
@@ -611,14 +623,34 @@ if search("none", args.conf_template, IGNORECASE) is None:
         sys.exit("Terminating the program.\nThe configuration file doesn't specify the solvent type.")
     else:
         solvent_type = solvent_type.group(1).lower()
+    pele_conf_template = Template(pele_conf_template_text)
     generate_configuration_file_template = True
 else:
     logging.info("The program won't generate any configuration file. Because no template has been given.")
     print "No configuration file will be generated."
     solvent_type = ""
     generate_configuration_file_template = False
-    keywords_in_the_template = {}
-    template_text = ""
+    keywords_in_the_pele_conf_template = {}
+    pele_conf_template_text = ""
+
+if args.adaptive_sampling:
+    logging.info(" - The program will prepare the input for the adaptiveSampling.py script.")
+    if os.path.isfile(args.adaptive_sampling):
+        logging.info(" - Reading the configuration template for the adaptive sampling.")
+        with open(args.adaptive_sampling) as template_file:
+            adaptive_conf_template_text = "".join(template_file.readlines())
+        keywords_in_the_adaptive_conf_template = set(pattern.group(1) for pattern in
+                                                     finditer("\$\{*(\w*_*w*)\}?",
+                                                              adaptive_conf_template_text))
+    else:
+        logging.critical("The file you have specified as the template for the adaptive control file doesn't exist.\n"
+                         "Terminating the program.")
+        sys.exit("Terminating the program.\nThe template file for the adaptive "
+                 "'{0}' doesn't exist.".format(args.adaptive_sampling))
+    adaptive_conf_template = Template(adaptive_conf_template_text)
+    adaptive = True
+else:
+    adaptive = False
 
 # This variable will store the name of the configuration files created.
 configuration_files_names = []
@@ -667,7 +699,11 @@ for filename in input_files:
     if args.debug:
         print filename
         print file_copy
-    copyfile(filename, file_copy)
+    if os.path.abspath(file_copy) == os.path.abspath(filename):
+        #TODO: option to overwrite /check/fail / rename.
+        pass
+    else:
+        copyfile(filename, file_copy)
     # If the file is in .mae format it'll be converted to .pdb format to be able to do the checks
     # and modifications needed in a simpler way.
     is_mae_file = search("(.*)\.mae", file_copy)
@@ -699,12 +735,13 @@ for filename in input_files:
         # print new_general_subfolder+ "*_complex_processed.pdb"
         if form_complexes:
             complex_filename = glob(new_general_subfolder + "*_complex_processed.pdb")[0]
+            irrelevant, ligand_name = check_ligand(file_copy, args.ligand_chain)
             # file4pele = complex_filename.split('/')
             ligand_filename = file_copy
         else:
             complex_filename = check_mutations_program_output(mutations_program_command, file_copy, errors_counter)
-            ligand_filename, warnings_counter = split_complex(complex_filename, args.ligand_chain,
-                                                                                warnings_counter)
+            ligand_filename, ligand_name, warnings_counter = split_complex(complex_filename, args.ligand_chain,
+                                                                           warnings_counter)
             if not complex_filename and not ligand_filename:
                 # The error message is generated in the split_complex function
                 continue
@@ -713,7 +750,7 @@ for filename in input_files:
             if args.debug:
                 print 0, 'uuppss'
             ligand_filename = file_copy
-            no_need4template = check_ligand(ligand_filename)
+            no_need4template, ligand_name = check_ligand(ligand_filename, args.ligand_chain)
             logging.info(" - Generating the complex file.")
             complex_text = receptor_text
             with open(ligand_filename, 'r') as ligand_file:
@@ -735,13 +772,12 @@ for filename in input_files:
             if args.debug:
                 print 'here'
             complex_filename = file_copy
-            ligand_filename, warnings_counter = split_complex(file_copy,
-                                                              args.ligand_chain,
-                                                              warnings_counter)
+            ligand_filename, ligand_name, warnings_counter = split_complex(file_copy, args.ligand_chain,
+                                                                           warnings_counter)
             if not complex_filename and not ligand_filename:
                 # The error message is generated in the split_complex function
                 continue
-            no_need4template = check_ligand(ligand_filename)
+            no_need4template, ligand_name = check_ligand(ligand_filename, args.ligand_chain)
 
         # block calling the mutations program to generate the preprocessed
         # .pdb file
@@ -828,29 +864,76 @@ for filename in input_files:
                 continue
     # This block creates the configuration file into the folder.
     if generate_configuration_file_template:
-        keywords_values, warnings_counter, errors_counter = obtain_current_values(keywords_in_the_template,
-                                                                                  complex_filename, warnings_counter,
-                                                                                  errors_counter, ligand_filename)
-        if not keywords_values:
+        pele_conf_key_val, warnings_counter, errors_counter = generate_pele_conf_values(keywords_in_the_pele_conf_template,
+                                                                                        complex_filename, warnings_counter,
+                                                                                        errors_counter, ligand_filename,
+                                                                                        adaptive)
+        if not pele_conf_key_val:
             continue
-        template = Template(template_text)
         try:
-            new_conf_file_text = template.substitute(keywords_values)
+            new_pel_conf_file_text = pele_conf_template.substitute(pele_conf_key_val)
         except (KeyError, ValueError) as e:
             logging.critical("ERROR: the configuration file template isn't able to obtain all the needed values.")
             logging.critical("The program has been terminated.")
             logging.shutdown()
             print "Programing error. Talk with the developer. Code L549"
             if args.debug:
-                print keywords_in_the_template
-                print keywords_values.keys()
+                print keywords_in_the_pele_conf_template
+                print pele_conf_key_val.keys()
             print e
             sys.exit("Error when creating the configuration file, missing keywords.")
         else:
-            new_conf_file_filename = new_general_subfolder + new_folder_name + "_{0}".format(solvent_type) + ".conf"
-            with open(new_conf_file_filename, 'w') as new_conf_file:
-                new_conf_file.write(new_conf_file_text)
-        configuration_files_names.append(new_conf_file_filename)
+            if args.adaptive_sampling:
+                new_pele_conf_file_filename = "{0}{1}_{2}_pele" \
+                                              "_adaptive_sampling.conf".format(new_general_subfolder,
+                                                                               new_folder_name,
+                                                                               solvent_type)
+            else:
+                new_pele_conf_file_filename = "{0}{1}_{2}.conf".format(new_general_subfolder,
+                                                                               new_folder_name, solvent_type)
+            with open(new_pele_conf_file_filename, 'w') as new_conf_file:
+                new_conf_file.write(new_pel_conf_file_text)
+        configuration_files_names.append(new_pele_conf_file_filename)
+    if args.adaptive_sampling:
+        adaptive_conf_key_val = {}
+        for k in keywords_in_the_adaptive_conf_template:
+            if search("input.*", k, IGNORECASE):
+                adaptive_conf_key_val[k] = complex_filename.split('/')[-1]
+            elif search("ligand_name", k, IGNORECASE):
+                adaptive_conf_key_val[k] = ligand_name
+            elif search("pele_*conf_*file", k, IGNORECASE):
+                adaptive_conf_key_val[k] = new_pele_conf_file_filename.split(os.sep)[-1]
+        try:
+            adaptive_conf_file_text = adaptive_conf_template.substitute(adaptive_conf_key_val)
+        except (KeyError, ValueError) as e:
+            logging.critical("ERROR: the configuration file template isn't able to obtain all the needed values.")
+            logging.critical("The program has been terminated.")
+            logging.shutdown()
+            print "Programing error. Talk with the developer. Code L903"
+            print adaptive_conf_key_val
+            if args.debug:
+                print keywords_in_the_adaptive_conf_template
+                print adaptive_conf_key_val.keys()
+            print e
+            sys.exit("Error when creating the configuration file, missing keywords.")
+        else:
+            new_adaptive_conf_file_filename = "{0}{1}_{2}_adaptive_sampling.conf".format(new_general_subfolder,
+                                                                                         new_folder_name,
+                                                                                         solvent_type)
+            with open(new_adaptive_conf_file_filename, 'w') as new_conf_file:
+                new_conf_file.write(adaptive_conf_file_text)
+        adaptive_output = search(r'"outputPath" *: *"(.*)",', adaptive_conf_file_text)
+        if adaptive_output is None:
+            logging.critical("ERROR: the template for the adaptive configuration file doesn't present"
+                             "and outputPath option.\nThe program won't work.")
+            logging.critical("The program has been terminated.")
+            logging.shutdown()
+            sys.exit("The template for the adaptive configuration file doesn't present"
+                     "and outputPath option.\nThe program won't work.")
+        else:
+            adaptive_output_path = "{0}{1}".format(new_general_subfolder, adaptive_output.group(1))
+        if not os.path.isdir(adaptive_output_path):
+            createfolder(adaptive_output_path)
 
 # Now we have to create a file to submit the jobs. The file will depend on where they want to be run, so
 # we should use a template, also there are some requirements that change depending on BSC/AZ
