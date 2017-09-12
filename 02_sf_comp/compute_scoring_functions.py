@@ -31,7 +31,7 @@ import logging
 import datetime
 
 import external_software_paths
-import modules  # This is for AZ.
+# import modules  # This is for AZ.
 
 
 def extract_ligand(pdb_filename, general_name, ligand_chain, executing_folder):
@@ -341,7 +341,7 @@ def binana_execution(receptor_filename, ligand_filename, execution_folder):
 def mmgbsa_execution(complex_filename, execution_folder, host, number_cpus, lig_chain):
     if args.debug:
         print "Executing mmgbsa"
-    mmgbsa_command = "prime_mmgbsa;{1};-csv;yes;-ligand;'chain.name  {4} ';" \
+    mmgbsa_command = "{0}prime_mmgbsa;{1};-csv;yes;-ligand;'chain.name  {4} ';" \
                      "-HOST;{2}:{3};-WAIT".format(external_software_paths.schrodinger_path,
                                                    complex_filename, host, number_cpus, lig_chain)
     if args.debug:
@@ -797,10 +797,10 @@ if glides2compute:
                                                                     args.schrodinger_cpus)
         if args.debug:
             print glide_working_directory
-        # try:
-        #     check_call(glide_command.split(), cwd=glide_working_directory)
-        # except CalledProcessError as e:
-        #     command_execution_failed(glide_command, e)
+        try:
+            check_call(glide_command.split(), cwd=glide_working_directory)
+        except CalledProcessError as e:
+            command_execution_failed(glide_command, e)
 if compute_rf_score:
     if args.debug:
         print 14
