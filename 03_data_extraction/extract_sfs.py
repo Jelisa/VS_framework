@@ -164,10 +164,10 @@ def mmgbsa_extraction(filename, ensemble_flag):
                       'r_psp_MMGBSA_dG_Bind_Hbond', 'r_psp_MMGBSA_dG_Bind_Lipo', 'r_psp_MMGBSA_dG_Bind_Packing',
                       'r_psp_MMGBSA_dG_Bind_Solv_GB', 'r_psp_MMGBSA_dG_Bind_vdW', 'r_psp_Lig_Strain_Energy']
     if ensemble_flag:
-        name_pattern = r"[_{0}]*(\w+_\d+)_.*".format(os.sep)
+        name_pattern = r"[_{0}]*([a-z0-9]+_\d+_\d+)_.*".format(os.sep)
     else:
-        name_pattern = r"[_{0}]*(\w+_\d+)_.*".format(os.sep)
-    complete_name = filename.split(os.sep)[-1].split("-out.csv")[0]
+        name_pattern = r"[_{0}]*([a-z0-9]+_\d+)_\d+.*".format(os.sep)
+    complete_name = filename.split(os.sep)[-1].split("out.csv")[0]
     pattern = re.search(name_pattern, complete_name)
     if pattern:
         system_id = pattern.group(1)
@@ -225,7 +225,7 @@ def dsx_extraction(filename, ensemble_flag):
         return False
     name = pattern.group(1)
     if ensemble_flag:
-        pattern2find_in_name = r"[_{0}]*(\w+_\d+)_.*l{,1}i{,1}g{,1}a{,1}n{,1}d{,1}"
+        pattern2find_in_name = r"[_{0}]*([a-z0-9]_\d+)_.*l{,1}i{,1}g{,1}a{,1}n{,1}d{,1}"
     else:
         pattern2find_in_name = r"[_{0}]*([a-z0-9]+_\d+)_\d*.*l{,1}i{,1}g{,1}a{,1}n{,1}d{,1}"
         # If there's any problem with the naming just change this patter. But
@@ -244,10 +244,7 @@ def dsx_extraction(filename, ensemble_flag):
 
 
 def xscore_extraction(filename, rt_factor, ensemble_flag):
-    if ensemble_flag:
-        id_pattern = r".* ligand from '[_{0}]*(\w+_\d+).*_ligand.mol2'".format(os.sep)
-    else:
-        id_pattern = r".* ligand from '[_{0}]*([a-z0-9]+_\d+).*_ligand.mol2'".format(os.sep)
+    id_pattern = r".* ligand from '(\w+.*_ligand).mol2'".format(os.sep)
     scores_patterns = r"(H[M,P,S]SCORE) .* = (-*\d.\d*)|(average) .* = (-*\d.\d*)"
     with open(filename, "r") as infile:
         text = infile.read()
@@ -257,6 +254,15 @@ def xscore_extraction(filename, rt_factor, ensemble_flag):
         logging.warning(" # WARNING: Something went really wrong when computing Xscore for this system, It'll be skip.")
         return False
     system_id = pattern.group(1)
+    if ensemble_flag:
+        pattern2find_in_name = r"[_{0}]*([a-z0-9]+_\d+_\d+).*ligand"
+    else:
+        pattern2find_in_name = r"[_{0}]*([a-z0-9]+_\d+)_\d+.*ligand"
+    pattern = re.search(pattern2find_in_name, system_id, re.IGNORECASE)
+    # print system_id
+    if pattern:
+        # print 'here'
+        system_id = pattern.group(1)
     values = {}
     for finding in re.finditer(scores_patterns, text, re.IGNORECASE):
         if "average" in finding.group():
@@ -274,7 +280,7 @@ def vina_extraction(filename, ensemble_flag):
     pattern2look4 = r"Affinity:\s*(-\d+\.\d+)"
     system_id = filename.split(os.sep)[-2]
     if not ensemble_flag:
-        name_pattern = r"([a-z0-9]+_\d+).*"
+        name_pattern = r"([a-z0-9]+_\d+)_\d+.*"
         pattern = re.search(name_pattern, system_id, re.IGNORECASE)
         if pattern:
             system_id = pattern.group(1)
@@ -302,9 +308,9 @@ def parse_csv_file(filename, ensemble_flag):
         dictio2return = {}
         for line in csv_parser:
             if ensemble_flag:
-                name_pattern = r"(\w+_\d+).*"
+                name_pattern = r"([az0-9]+_\d+_\d+).*"
             else:
-                name_pattern = r"([a-z0-9]+_\d+).*"
+                name_pattern = r"([a-z0-9]+_\d+)_\d+.*"
             pattern = re.search(name_pattern, line[0])
             if pattern:
                 system_id = pattern.group(1)
@@ -446,8 +452,10 @@ def merge_data(data2use, type_of_data, systems2use, energies_dictio, output_name
                 output_filename = output_name + "_unknown_descriptor_{0:02d}.csv".format(unknowns_counter)
                 logging.error("ERROR: The descriptors {0} doesn't agree with any of the predetermined descriptors it"
                               "will be written to the file {1}".format(keyword, output_filename))
-            with open(output_filename, 'w') as outfile:
-                outfile.write(text)
+        else:
+            output_filename = output_name + "_{0}_common_systems.csv".format(keyword)
+        with open(output_filename, 'w') as outfile:
+            outfile.write(text)
     if energies_dictio:
         all_descriptors_energies = []
         for system in sorted(systems2use):
@@ -636,9 +644,9 @@ if args.rotable_bonds_files:
         else:
             pdb_code = filename.split(os.sep)[-1].split("_ligand.pdbqt")[0]
         with open(filename, 'r') as infile:
-            text = infile.read()
+            text_all = infile.read()
         rotable_bonds_pattern = r"REMARK\s+(\d+)\s+active torsions:"
-        pattern = re.search(rotable_bonds_pattern, text)
+        pattern = re.search(rotable_bonds_pattern, text_all)
         if pattern is None:
             logging.error("The ligand has no rotable bonds...")
             continue
@@ -657,7 +665,7 @@ if args.rf_as_score_file:
         logging.warning(" # WARNING: The file {0} doesn't exist. It'll be skipped.".format(args.rf_score_file))
     else:
         with open(args.rf_as_score_file, 'r') as infile:
-            text = infile.read()
+            text_all = infile.read()
             rf_values_in_output_pattern = r"\"(\w+)(?:_ligand)*\",(-*\d+\.\d+)"
             first = True
             if "rf_score" in args.convert:
@@ -665,11 +673,11 @@ if args.rf_as_score_file:
                                                                                      args.conversion_temperature *
                                                                                      (log(10 ** (
                                                                                          -float(pattern.group(2))))))
-                                                 for pattern in re.finditer(rf_values_in_output_pattern, text,
+                                                 for pattern in re.finditer(rf_values_in_output_pattern, text_all,
                                                                             re.IGNORECASE)}
             else:
                 scoring_functions["rf_score"] = {pattern.group(1): pattern.group(2)
-                                                 for pattern in re.finditer(rf_values_in_output_pattern, text,
+                                                 for pattern in re.finditer(rf_values_in_output_pattern, text_all,
                                                                             re.IGNORECASE)}
 
 if args.rf_descriptors_file:
@@ -754,12 +762,20 @@ if args.xglide_files:
             logging.warning(" # WARNING: The file {0} doesn't exist. It'll be skipped.".format(filename))
         else:
             with open(filename, 'r') as infile:
-                text = infile.read()
+                text_all = infile.read()
             if args.ensemble:
-                xglide_log_pattern = r"(\w+_\d+).*\s+\w+\s+\(.*\)\s+\d+\.\d+\s+(-*\d+\.\d+)"
+                xglide_log_pattern = r"(\w+).*\s+\w+\s+\(.*\)\s+\d+\.\d+\s+(-*\d+\.\d+)"
             else:
-                xglide_log_pattern = r"([a-z0-9]+_\d+).*\s+\w+\s+\(.*\)\s+\d+\.\d+\s+(-*\d+\.\d+)"
-            scoring_functions["glide"].update({x.group(1): x.group(2) for x in re.finditer(xglide_log_pattern, text)})
+                xglide_log_pattern = r"(\w+).*\s+\w+\s+\(.*\)\s+\d+\.\d+\s+(-*\d+\.\d+)"
+            # scoring_functions["glide"].update({x.group(1): x.group(2) for x in re.finditer(xglide_log_pattern, text_all)})
+            for x in re.finditer(xglide_log_pattern, text_all):
+                # print 'here', x.group(1)
+                id_pattern = '\w*[_{0}]+(\w+_\d+)_\d+'.format(os.sep)
+                pattern = re.search(id_pattern, x.group(1))
+                if pattern:
+                    scoring_functions["glide"].update({pattern.group(1): x.group(2)})
+                else:
+                    scoring_functions["glide"].update({x.group(1): x.group(2)})
             if not scoring_functions["glide"]:
                 logging.error(" # ERROR: Couldn't find any line with the pattern used in this script to extract "
                               "the scores from the log file of xglide script.")
@@ -840,7 +856,7 @@ if systems_with_all_sfs_descriptors:
 
 unknown_descriptors_counter = 0
 for keyword, dictionary in sorted(descriptors.iteritems()):
-    current_values = []
+    current_values_all = []
     header = ""
     logging.info("Processing the values from the {0} descriptors.".format(keyword))
     for system, elements in sorted(dictionary.iteritems()):
@@ -871,53 +887,54 @@ for keyword, dictionary in sorted(descriptors.iteritems()):
                                  "scoring and descriptors files.\nProgram terminated")
                     else:
                         if values2use[-1] == ",":
-                            current_values.append("{0},{1}{2}".format(system, values2use, energy))
+                            current_values_all.append("{0},{1}{2}".format(system, values2use, energy))
                         if values2use[0] == ",":
-                            current_values.append("{0}{1},{2}".format(system, values2use, energy))
+                            current_values_all.append("{0}{1},{2}".format(system, values2use, energy))
                         else:
-                            current_values.append("{0},{1},{2}".format(system, values2use, energy))
+                            current_values_all.append("{0},{1},{2}".format(system, values2use, energy))
                     if not header:
                         header = "ID{0},Exp_energy\n".format(keys2use)
             else:
                 if not header:
                     header = "ID{0},Exp_energy\n".format(keys2use)
                 if values2use[-1] == ",":
-                    current_values.append("{0},{1}{2}".format(system, values2use, energy_dictionary[system]))
+                    current_values_all.append("{0},{1}{2}".format(system, values2use, energy_dictionary[system]))
                 elif values2use[0] == ",":
-                    current_values.append("{0}{1},{2}".format(system, values2use, energy_dictionary[system]))
+                    current_values_all.append("{0}{1},{2}".format(system, values2use, energy_dictionary[system]))
                 else:
-                    current_values.append("{0},{1},{2}".format(system, values2use, energy_dictionary[system]))
+                    current_values_all.append("{0},{1},{2}".format(system, values2use, energy_dictionary[system]))
         else:
             if values2use[-1] == ",":
-                current_values.append("{0},{1}".format(system, values2use[:-1]))
+                current_values_all.append("{0},{1}".format(system, values2use[:-1]))
             elif values2use[0] == ",":
-                current_values.append("{0}{1}".format(system, values2use))
+                current_values_all.append("{0}{1}".format(system, values2use))
             else:
-                current_values.append("{0},{1}".format(system, values2use))
+                current_values_all.append("{0},{1}".format(system, values2use))
                 # current_values = ["{0},{1}".format(system, ",".join(map(str, dictio.values())))
                 #                   for system, dictio in dictionary.iteritems()]
         if not header:
             # print 'c', keys2use
             header = "{0}{1}\n".format("ID", keys2use)
-    text = header + "\n".join(current_values)
+    text_all = header + "\n".join(current_values_all)
     if keyword == "structural":
-        output_filename = args.output_general_name + "_structural_descriptors_all_systems.csv"
+        output_filename_all = args.output_general_name + "_structural_descriptors_all_systems.csv"
     elif keyword == "mmgbsa":
-        output_filename = args.output_general_name + "_energy_descriptors_all_systems.csv"
+        output_filename_all = args.output_general_name + "_energy_descriptors_all_systems.csv"
     elif keyword == "rf_score":
-        output_filename = args.output_general_name + "_rf_descriptors_all_systems.csv"
+        output_filename_all = args.output_general_name + "_rf_descriptors_all_systems.csv"
     else:
         unknown_descriptors_counter += 1
-        output_filename = args.output_general_name + \
+        output_filename_all = args.output_general_name + \
                           "_unknown_descriptor_{0:02d}_all_systems.csv".format(unknown_descriptors_counter)
         logging.warning("WARNING: The descriptors {0} doesn't agree with any of the predetermined descriptors it"
-                        "will be written to the file {1}".format(keyword, output_filename))
-    with open(output_filename, 'w') as outfile:
-        outfile.write(text)
+                        "will be written to the file {1}".format(keyword, output_filename_all))
+    with open(output_filename_all, 'w') as outfile:
+        outfile.write(text_all)
 
 for keyword, dictionary in sorted(scoring_functions.iteritems()):
     header = None
-    current_values = []
+    current_values_all = []
+    current_values_com = []
     logging.info("Processing the values from the scoring function: {0} .".format(keyword))
     for system in sorted(dictionary.keys()):
         keys2use, values2use = process_values(dictionary, system, keyword)
@@ -952,35 +969,62 @@ for keyword, dictionary in sorted(scoring_functions.iteritems()):
                                  "scoring and descriptors files.\nProgram terminated")
                     else:
                         if values2use[-1] == ",":
-                            current_values.append("{0},{1}{2}".format(system, values2use, energy))
+                            new_line = "{0},{1}{2}".format(system, values2use, energy)
+                            # current_values_all.append()
                         elif values2use[0] == ',':
-                            current_values.append("{0}{1},{2}".format(system, values2use, energy))
+                            new_line = "{0}{1},{2}".format(system, values2use, energy)
+                            # current_values_all.append("{0}{1},{2}".format(system, values2use, energy))
                         else:
-                            current_values.append("{0},{1},{2}".format(system, values2use, energy))
+                            new_line = "{0},{1},{2}".format(system, values2use, energy)
+                            # current_values_all.append("{0},{1},{2}".format(system, values2use, energy))
+                        current_values_all.append(new_line)
+                        if system in systems_with_all_sfs_descriptors:
+                            current_values_com.append(new_line)
+                    if system in systems_with_all_sfs_descriptors:
+                        current_values_com.append(new_line)
             else:
                 # print 'here'
                 if values2use[-1] == ",":
-                    current_values.append("{0},{1}{2}".format(system, values2use, energy_dictionary[system]))
+                    new_line = "{0},{1}{2}".format(system, values2use, energy_dictionary[system])
+                    # current_values_all.append()
                 elif values2use[0] == ",":
-                    current_values.append("{0}{1},{2}".format(system, values2use, energy_dictionary[system]))
+                    new_line = "{0}{1},{2}".format(system, values2use, energy_dictionary[system])
+                    # current_values_all.append("{0}{1},{2}".format(system, values2use, energy_dictionary[system]))
                 else:
-                    current_values.append("{0},{1},{2}".format(system, values2use, energy_dictionary[system]))
+                    new_line = "{0},{1},{2}".format(system, values2use, energy_dictionary[system])
+                    # current_values_all.append("{0},{1},{2}".format(system, values2use, energy_dictionary[system]))
+                    current_values_all.append(new_line)
+                    if system in systems_with_all_sfs_descriptors:
+                        current_values_com.append(new_line)
         else:
             if values2use[-1] == ",":
-                current_values.append("{0},{1}".format(system, values2use[:-1]))
+                new_line = "{0},{1}".format(system, values2use[:-1])
+                # current_values_all.append()
             elif values2use[0] == ",":
-                current_values.append("{0}{1}".format(system, values2use))
+                new_line = "{0}{1}".format(system, values2use)
+                # current_values_all.append("{0}{1}".format(system, values2use))
             else:
-                current_values.append("{0},{1}".format(system, values2use))
+                new_line = "{0},{1}".format(system, values2use)
+                # current_values_all.append("{0},{1}".format(system, values2use))
+            current_values_all.append(new_line)
+            if system in systems_with_all_sfs_descriptors:
+                current_values_com.append(new_line)
+
+            if system in systems_with_all_sfs_descriptors:
+                current_values_com.append(new_line)
     if energy_dictionary:
         if header[-1] == ",":
             header += "Exp_energy"
         else:
             header += ",Exp_energy"
-    text = header + "\n" + "\n".join(current_values)
-    output_filename = args.output_general_name + "_" + keyword + "_all_systems.csv"
-    with open(output_filename, 'w') as outfile:
-        outfile.write(text)
+    text_all = header + "\n" + "\n".join(current_values_all)
+    text_com = header + "\n" + "\n".join(current_values_all)
+    output_filename_all = args.output_general_name + "_" + keyword + "_all_systems.csv"
+    output_filename_com = args.output_general_name + "_" + keyword + "_all_systems.csv"
+    with open(output_filename_all, 'w') as outfile:
+        outfile.write(text_all)
+    with open(output_filename_com, 'w') as outfile:
+        outfile.write(text_com)
 if missing_systems:
     logging.info("The failing systems are:{0}".format("\n- " + "\n- ".join(missing_systems)))
 logging.info("{} : Program finished correctly.".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M")))
