@@ -17,7 +17,7 @@ since they're unique codes.
 Jelisa Iglesias 24/11/2016
 mail: jelisa.iglesias@gmail.com
 """
-
+#TODO: change the parse_csv_file to use a pandas df.
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import os
 import logging
@@ -327,7 +327,8 @@ def process_values(dictionary2analyze, keyword2dictionary, possible_name):
         print "dictionary:", dictionary2analyze.keys()
         print "dict_keyword:", keyword2dictionary
         print 'scoring function/descriptor analyzed:', possible_name
-        sys.exit("OK, this shouldn't ever happen. There has been an error with the data you've provided. Review it.")
+        raise KeyError
+        # sys.exit("OK, this shouldn't ever happen. There has been an error with the data you've provided. Review it.")
         # return False
     else:
         elements = dictionary2analyze[keyword2dictionary]
@@ -770,12 +771,17 @@ if args.xglide_files:
             # scoring_functions["glide"].update({x.group(1): x.group(2) for x in re.finditer(xglide_log_pattern, text_all)})
             for x in re.finditer(xglide_log_pattern, text_all):
                 # print 'here', x.group(1)
-                id_pattern = '\w*[_{0}]+(\w+_\d+)_\d+'.format(os.sep)
+                id_pattern = '\w*[_{0}]+(\w+_\d+)_\d+_'.format(os.sep)
                 pattern = re.search(id_pattern, x.group(1))
                 if pattern:
                     scoring_functions["glide"].update({pattern.group(1): x.group(2)})
                 else:
-                    scoring_functions["glide"].update({x.group(1): x.group(2)})
+                    pattern = re.search('(\w+_\d+)_\d+'.format(os.sep), x.group(1))
+                    if args.ensemble or pattern is None:
+                        scoring_functions["glide"].update({x.group(1): x.group(2)})
+                    else:
+                        scoring_functions["glide"].update({pattern.group(1): x.group(2)})
+
             if not scoring_functions["glide"]:
                 logging.error(" # ERROR: Couldn't find any line with the pattern used in this script to extract "
                               "the scores from the log file of xglide script.")
