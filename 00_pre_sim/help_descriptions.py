@@ -12,7 +12,16 @@ pele_folder_desc = "This option specifies the path to look for the Data and Docu
                    "simulations."
 debug_desc = "This option is mostly for the developers, when present the program prints more messages in every step, " \
              "that may help to find errors."
-template_desc = "The configuration file used as template, to generate all the configurations files needed."
+conf_template_desc = "The configuration file used as template, to generate all the configurations files needed."
+no_templates = "This option acts as a flag when present the program won't generate the template nor the ligand " \
+               "rotamer library."
+adaptive_sampling_desc = "If used, it should specify the path to the templatized control file to be used " \
+                         "to create the control files for the adaptiveSampling.py script."
+rewrite_desc = "Whe this option is present the pre-existing files will be rewritten, otherwise the program " \
+               "won't generate the files that already exist."
+conf_file_suffix_desc = "This option specifies a suffix to use for the configuration file name, when it's " \
+                        "not present the file will be named systemID_solvent.conf where the systemID derives " \
+                        "from the input file name."
 not_interactive_desc = "If this option is present the program won't make any requests to the user, " \
                        "and will assume certain things (see the README.cmd file)."
 schrodinger_path_desc = "The complete path to schrodinger software, without final separator."
@@ -25,12 +34,8 @@ constraint_desc = "This option specifies the constraint value to use when extrac
                   " file for the PELE configuration file."
 atoms2constraint_desc = "This option is a list of the atom names (blank spaces included) to apply contraints when" \
                         " generating the configuration file for PELE."
+ligand_chain_desc = "The chain where the ligand is present. This chain should contain only the ligand and unless it " \
+                    "is a peptidic ligand it should be formed by one single residue."
 mutations_program_path_desc = "The complete path to the mutations program script to prepare pdb files for PELE."
 obc_param_generator_desc = "The complete path to the solventOBCParamsGenerator script to generate the OBC parameters" \
                            "for the ligand for PELE."
-ligand_chain_desc = "The chain where the ligand is present. This chain should contain only the ligand and unless it " \
-                    "is a peptidic ligand it should be formed by one single residue."
-no_templates = "This option acts as a flag when present the program won't generate the template nor the ligand " \
-               "rotamer library."
-adaptive_sampling_desc = "If used, it should specify the path to the templatized control file to be used " \
-                         "to create the control files for the adaptiveSampling.py script."

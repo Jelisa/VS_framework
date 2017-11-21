@@ -18,3 +18,12 @@ atomic_table_weights = {
 }
 
 accepted_formats = "\.mae|\.pdb"  # This specifies the patterns for the accepted formats.
+
+templates_keywords_pattern = "\$\{*(\w*_*w*)\}?"
+
+complexes_pre_defined_name = ".*_complex_processed.pdb"
+complexes_pre_created_name = "*_processed.pdb"
+
+datalocal_templates = "DataLocal/Templates/OPLS2005/HeteroAtoms/"
+datalocal_rotamerlib = "DataLocal/LigandRotamerLibs/"
+
