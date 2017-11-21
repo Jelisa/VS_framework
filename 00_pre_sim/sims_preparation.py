@@ -714,7 +714,7 @@ for filename in input_files:
         file_copy = file_in_pdb_format  # Updating the variable containing the name of the file to work with
         try:
             check_call(command2call.split())
-        except CalledProcessError as error_message:
+        except (CalledProcessError, OSError) as error_message:
             print "The pdbconverter of maestro failed to when being execute. The program will be terminated."
             logging.critical("ERROR: The pdbconverter from schrodinger couldn't be executed.")
             logging.info("The error is in the command ' {} '".format(command2call))
