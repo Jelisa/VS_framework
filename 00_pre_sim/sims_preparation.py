@@ -622,6 +622,7 @@ def create_template_and_rotamerlib(initial_pdb, template_folder, rotamer_library
             logging.error(" - ERROR: The command ' {} ' couldn't be executed. Skipping system".format(command2call2))
             error = True
     else:
+        terminate_if_errors_dict['ploprottemp'] = False
         if "Removing Intermediate File:" not in ploprottemp_output:
             error = True
             logging.error(" - The PlopRotTemp.py hasn't finished correctly, so the template and/or the rotamer "
@@ -1005,6 +1006,7 @@ def main(args, log):
             if s_error:
                 total_errors_counter += 1
                 continue
+            print command_first_execution
             lig_template, s_error = create_template_and_rotamerlib(ligand_filename, current_pele_template_folder,
                                                                    current_rotamerlibs_folder,
                                                                    command_first_execution)
