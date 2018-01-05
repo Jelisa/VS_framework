@@ -12,10 +12,8 @@ import numpy as np
 import re
 import datetime
 import logging
-
 import prody
-
-import new_parameters_help
+import parameters_help
 
 
 def raise_parsing_output_error(directory, type_of_simulation):
@@ -43,7 +41,7 @@ def parse_adaptive_sampling_reports(directory):
         try:
             next_report['trajectory'] = glob.glob("{}{}/*trajectory_{}.pdb".format(directory, epoch, processor))[0]
         except IndexError:
-    	    print "{}{}/*trajectory_{}.pdb".format(directory, epoch, processor)
+            print "{}{}/*trajectory_{}.pdb".format(directory, epoch, processor)
             raise_parsing_output_error(directory, 'adaptive')
             return False
         reports = reports.append(next_report, ignore_index=True)
@@ -117,6 +115,7 @@ def write_selected_structure(new_directory, new_structure_filename, selected_str
             raise OSError(new_directory)
     with open(new_structure_filename, 'w') as outfile:
         outfile.write(selected_structure_text)
+
 
 def main(args):
     """
@@ -224,37 +223,37 @@ def main(args):
 
 if __name__ == '__main__':
     parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter,
-                            description=new_parameters_help.structure_Selection_program_desc)
+                            description=parameters_help.structure_Selection_program_desc)
     parser.add_argument("-input", required=True, nargs="+",
-                        help=new_parameters_help.structure_Selection_input_desc)
+                        help=parameters_help.structure_Selection_input_desc)
     parser.add_argument("-output_folder", default="", required=True,
-                        help=new_parameters_help.structure_Selection_output_folder_desc)
+                        help=parameters_help.structure_Selection_output_folder_desc)
     parser.add_argument("-ligand_chain", default="Z",
-                        help=new_parameters_help.structure_selection_ligand_chain_desc)
+                        help=parameters_help.structure_selection_ligand_chain_desc)
     parser.add_argument("-only_statistics", default=False, action="store_true",
-                        help=new_parameters_help.structure_selection_only_statistics)
+                        help=parameters_help.structure_selection_only_statistics)
     parser.add_argument("-initial_energies", action="store_true",
-                        help=new_parameters_help.sims_review_initial_energies)
+                        help=parameters_help.sims_review_initial_energies)
     parser.add_argument("-simulation_type", default="single_core",
                         choices=["single_core", "adaptive", "mpi"],
-                        help=new_parameters_help.structure_Selection_simulation_type_desc)
+                        help=parameters_help.structure_Selection_simulation_type_desc)
     parser.add_argument("-log_file", default="structures_extraction.log",
-                        help=new_parameters_help.log_file_desc)
+                        help=parameters_help.log_file_desc)
 
     subparsers = parser.add_subparsers(dest='type_of_selection',
-                                       help=new_parameters_help.structure_Selection_selection_criteria)
+                                       help=parameters_help.structure_Selection_selection_criteria)
     parser_minimum_energy = subparsers.add_parser('minimum_energy',
-                                                  description=new_parameters_help.structure_Selection_min_ener_desc)
+                                                  description=parameters_help.structure_Selection_min_ener_desc)
     parser_minimum_energy.add_argument('-energy_type', default="binding_energy",
                                        const='binding_energy', nargs="?",
                                        choices=["binding_energy", "pele_energy"],
-                                       help=new_parameters_help.ss_min_energy_type_desc)
+                                       help=parameters_help.ss_min_energy_type_desc)
     parser_rmsd_clust = subparsers.add_parser('rmsd_clustering',
-                                              description=new_parameters_help.structure_Selection_rmsd_clust_desc)
+                                              description=parameters_help.structure_Selection_rmsd_clust_desc)
     parser_energy_clust = subparsers.add_parser('energy_clustering',
-                                                description=new_parameters_help.structure_Selection_ener_clust_desc)
+                                                description=parameters_help.structure_Selection_ener_clust_desc)
     parser_energy_clust.add_argument("-deltag", default=5, type=int,
-                                     help=new_parameters_help.ss_energy_c_deltag_desc)
+                                     help=parameters_help.ss_energy_c_deltag_desc)
     # parser.add_argument("-single_structure", action="store_true",
     #                     help=new_parameters_help.structure_selection_single_structure)
 
