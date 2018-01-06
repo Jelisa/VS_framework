@@ -45,7 +45,8 @@ def parse_adaptive_sampling_reports(directory):
             raise_parsing_output_error(directory, 'adaptive')
             return False
         reports = reports.append(next_report, ignore_index=True)
-    reports.rename(columns={'numberOfAcceptedPeleSteps': 'accepted_steps'}, inplace=True)
+    reports.rename(columns={'numberOfAcceptedPeleSteps': 'accepted_steps',
+                            'currentEnergy': 'pele_total_energy'}, inplace=True)
     return reports
 
 
@@ -68,7 +69,8 @@ def parse_mpi_simulation_reports(directory):
             # raise_parsing_output_error(directory, 'mpi')
             return False
         reports = reports.append(next_report, ignore_index=True)
-    reports.rename(columns={'numberOfAcceptedPeleSteps': 'accepted_steps'}, inplace=True)
+    reports.rename(columns={'numberOfAcceptedPeleSteps': 'accepted_steps',
+                            'currentEnergy': 'pele_total_energy'}, inplace=True)
     return reports
 
 
@@ -93,7 +95,8 @@ def parse_single_core_simulation_report(directory):
         reports['trajectory'] = glob.glob("{}*trajectory*.pdb".format(directory))[0]
     except IndexError:
         return False
-    reports.rename(columns={'AcceptedSteps': 'accepted_steps'}, inplace=True)
+    reports.rename(columns={'AcceptedSteps': 'accepted_steps',
+                            'Energy': 'pele_total_energy'}, inplace=True)
     return reports
 
 
@@ -115,6 +118,71 @@ def write_selected_structure(new_directory, new_structure_filename, selected_str
             raise OSError(new_directory)
     with open(new_structure_filename, 'w') as outfile:
         outfile.write(selected_structure_text)
+
+
+def refine_data(raw_df, selection_window):
+    """
+    A function to select the elements of the dataframe that are within the minimum value of a given column
+    the 'pele_total_energy' in this case, and a value set by a given threshold
+    :param raw_df: a pandas dataframe containing the data, it should have the 'pele_total_energy' column
+    :param selection_window: an integer containing the maximum variance to allow from the minimum.
+    :return: a pandas dataframe containing only the element within the range.
+    """
+    minimum_value = raw_df['pele_total_energy'].iloc[raw_df['pele_total_energy'].argmin()]
+    maximum_value = minimum_value + selection_window
+    print minimum_value, maximum_value
+    right_data = raw_df.loc[raw_df['pele_total_energy'].between(minimum_value, maximum_value)]
+    right_data = right_data.reset_index()  # Maybe interesting to add the drop=True to avoid adding a
+    # new column with the old indexes
+    return right_data
+
+
+def select_and_write_structure(trajectory_filename, trajectory_model, current_output_folder, system_general_name):
+    """
+    This function extacts the selected model from the trajectory file and calls the
+    write_selected_structure function in order to do the writing
+    :param trajectory_filename: a string containing the path to the trajectory file to process
+    :param trajectory_model: a string containing the number of the model to be extracted from the trajectory
+    :param current_output_folder: a string containing the path where the new folder where the structure
+                                should be extracted
+    :param system_general_name: a string containing the name to be used as prefix for the output.
+    :return: a boolean indicating whether the structure selection has been possible or not.
+    """
+    with open(trajectory_filename) as infile:
+        trajectory_text = infile.read()
+    pattern = re.search(r'MODEL +{}\n(.*?)\nENDMDL'.format(trajectory_model),
+                        trajectory_text, re.DOTALL)
+    if pattern is None:
+        logging.warning("WARNING: There's some problem with the trajectory. The selected "
+                        "model {0} cannot be found in {1}".format(trajectory_model,
+                                                                  trajectory_filename))
+        return False
+    else:
+        selected_model_text = pattern.group(1)
+        current_output_folder += "_{0}/".format(trajectory_model)
+        output_filename = current_output_folder + \
+                          "{0}_{1}.pdb".format(system_general_name, trajectory_model)
+        write_selected_structure(current_output_folder, output_filename, selected_model_text)
+        return True
+
+
+def write_metrics_csv(initial_metrics, selected_metrics, output_path, prefix):
+    """
+    This function generates two .csv files from the two dataframes it receives
+    :param initial_metrics: a pandas dataframe containing the data for the initial model of the report
+    :param selected_metrics: a pandas dataframe containing the data for the selected model of the report
+    :param output_path: a string containing the path where the .csv files should be writen.
+    :param prefix: a string containing the prefix to be used for the .csv files to generate
+    :return:
+    """
+    if prefix:
+        initial_metrics_output_filename = "{0}{1}_pele_initial_metrics.csv".format(output_path, prefix)
+        selected_metrics_output_filename = "{0}{1}_pele_selected_models_metrics.csv".format(output_path, prefix)
+    else:
+        initial_metrics_output_filename = "{0}pele_initial_metrics.csv".format(output_path)
+        selected_metrics_output_filename = "{0}pele_selected_models_metrics.csv".format(output_path)
+    initial_metrics.to_csv(initial_metrics_output_filename, index=False)
+    selected_metrics.to_csv(selected_metrics_output_filename, index=False)
 
 
 def main(args):
@@ -141,7 +209,7 @@ def main(args):
             if e[0] == 2:
                 logging.critical("The path to your output folder doesn't exist."
                                  "\n{0}".format(output_folder))
-                logging.info("{0} : Abrupte termination of the program"
+                logging.info("{0} : Abrupt termination of the program"
                              ".".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M")))
                 logging.shutdown()
                 raise OSError("The path to your output folder doesn't exist."
@@ -149,9 +217,8 @@ def main(args):
     if output_folder[-1] != os.sep:
         output_folder += os.sep
     skipped_systems = 0
-    statistics = {}
-    energies_values = {}
-    initial_energies_values = {}
+    selected_models = pd.DataFrame()
+    initial_energies_values = pd.DataFrame()
     for folder in args.input:
         # Adding the OS separator to the folder path
         if folder[-1] != os.sep:
@@ -171,21 +238,30 @@ def main(args):
                 system_general_name = folder.split('/')[-3]
         else:
             system_general_name = pattern.group(1)
+        print system_general_name
         # Set the outputs names
         current_output_folder = output_folder + system_general_name
+
         # Parse the reports files.
         if args.simulation_type == "mpi":
-            reports_values = parse_mpi_simulation_reports(folder)
+            raw_reports_values = parse_mpi_simulation_reports(folder)
         elif args.simulation_type == "adaptive":
             print 'h'
-            reports_values = parse_adaptive_sampling_reports(folder)
-            print reports_values
+            raw_reports_values = parse_adaptive_sampling_reports(folder)
+            print raw_reports_values
         else:
-            reports_values = parse_single_core_simulation_report(folder)
-        if reports_values is False:
+            raw_reports_values = parse_single_core_simulation_report(folder)
+        if raw_reports_values is False:
             logging.error("WARNING: The report or trajectory file are missing, the system will be discontinued.")
             skipped_systems += 1
             continue
+
+        # Set the columns to be extracted to the statistics
+        columns2use = [c for c in raw_reports_values.columns if c not in ['#Task', 'Step']]
+        # Grab the initial metrics
+        initial_energies_values = initial_energies_values.append(raw_reports_values[columns2use].iloc[0])
+
+        refined_reports_values = refine_data(raw_reports_values, args.total_energy_deviation)
 
         if args.type_of_selection == "rmsd_clustering":
             raise LookupError("The selection using the rmsd clustering isn't implemented yet.")
@@ -193,28 +269,20 @@ def main(args):
             raise LookupError("The selection using the energt clustering isn't implemented yet.")
         else:
             if args.energy_type == "binding_energy":
-                # print reports_values
-                model_2_use = reports_values.iloc[reports_values['Binding Energy'].argmin()]
+                model_2_use = refined_reports_values.iloc[refined_reports_values['Binding Energy'].argmin()]
             else:
-                model_2_use = reports_values.iloc[reports_values['currentEnergy'].argmin()]
+                model_2_use = refined_reports_values.iloc[refined_reports_values['pele_total_energy'].argmin()]
             trajectory_model = model_2_use['accepted_steps'] + 1
             trajectory_filename = model_2_use['trajectory']
-            with open(trajectory_filename) as infile:
-                trajectory_text = infile.read()
-            pattern = re.search(r'MODEL +{}\n(.*?)\nENDMDL'.format(trajectory_model),
-                                trajectory_text, re.DOTALL)
-            if pattern is None:
-                logging.warning("WARNING: There's some problem with the trajectory. The selected "
-                                "model {0} cannot be found in {1}".format(trajectory_model,
-                                                                          trajectory_filename))
-                skipped_systems += 1
-                continue
-            else:
-                selected_model_text = pattern.group(1)
-                current_output_folder += "_{0}/".format(trajectory_model)
-                output_filename = current_output_folder + \
-                                  "{0}_{1}.pdb".format(system_general_name, trajectory_model)
-                write_selected_structure(current_output_folder, output_filename, selected_model_text)
+            if not args.only_statistics:
+                correct_process = select_and_write_structure(trajectory_filename, trajectory_model,
+                                                             current_output_folder, system_general_name)
+                if not correct_process:
+                    skipped_systems += 1
+                    continue
+            selected_models = selected_models.append(model_2_use[columns2use])
+
+    write_metrics_csv(initial_energies_values, selected_models, output_folder, args.output_prefix)
 
     logging.info("{} : Program finished correctly.\n"
                  "With {} warnings".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), skipped_systems))
@@ -227,31 +295,35 @@ if __name__ == '__main__':
     parser.add_argument("-input", required=True, nargs="+",
                         help=parameters_help.structure_Selection_input_desc)
     parser.add_argument("-output_folder", default="", required=True,
-                        help=parameters_help.structure_Selection_output_folder_desc)
+                        help=parameters_help.structure_selection_output_folder_desc)
+    parser.add_argument("-output_prefix", default="",
+                        help=parameters_help.structure_selection_output_prefix_desc)
     parser.add_argument("-ligand_chain", default="Z",
                         help=parameters_help.structure_selection_ligand_chain_desc)
     parser.add_argument("-only_statistics", default=False, action="store_true",
                         help=parameters_help.structure_selection_only_statistics)
+    parser.add_argument("-total_energy_deviation", default=50, type=int,
+                        help=parameters_help.ss_total_energy_deviation_desc)
     parser.add_argument("-initial_energies", action="store_true",
                         help=parameters_help.sims_review_initial_energies)
     parser.add_argument("-simulation_type", default="single_core",
                         choices=["single_core", "adaptive", "mpi"],
-                        help=parameters_help.structure_Selection_simulation_type_desc)
+                        help=parameters_help.structure_selection_simulation_type_desc)
     parser.add_argument("-log_file", default="structures_extraction.log",
                         help=parameters_help.log_file_desc)
 
     subparsers = parser.add_subparsers(dest='type_of_selection',
-                                       help=parameters_help.structure_Selection_selection_criteria)
+                                       help=parameters_help.structure_selection_selection_criteria)
     parser_minimum_energy = subparsers.add_parser('minimum_energy',
-                                                  description=parameters_help.structure_Selection_min_ener_desc)
+                                                  description=parameters_help.structure_selection_min_ener_desc)
     parser_minimum_energy.add_argument('-energy_type', default="binding_energy",
                                        const='binding_energy', nargs="?",
                                        choices=["binding_energy", "pele_energy"],
                                        help=parameters_help.ss_min_energy_type_desc)
     parser_rmsd_clust = subparsers.add_parser('rmsd_clustering',
-                                              description=parameters_help.structure_Selection_rmsd_clust_desc)
+                                              description=parameters_help.structure_selection_rmsd_clust_desc)
     parser_energy_clust = subparsers.add_parser('energy_clustering',
-                                                description=parameters_help.structure_Selection_ener_clust_desc)
+                                                description=parameters_help.structure_selection_ener_clust_desc)
     parser_energy_clust.add_argument("-deltag", default=5, type=int,
                                      help=parameters_help.ss_energy_c_deltag_desc)
     # parser.add_argument("-single_structure", action="store_true",
