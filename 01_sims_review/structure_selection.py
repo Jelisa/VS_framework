@@ -15,6 +15,7 @@ import logging
 import prody
 import parameters_help
 
+# TODO: in case of more than one distance column in the report some system to identify them should be implemented.
 
 def raise_parsing_output_error(directory, type_of_simulation):
     raise IOError("The directory {0} doesn't contain the right information"
@@ -45,8 +46,15 @@ def parse_adaptive_sampling_reports(directory):
             raise_parsing_output_error(directory, 'adaptive')
             return False
         reports = reports.append(next_report, ignore_index=True)
-    reports.rename(columns={'numberOfAcceptedPeleSteps': 'accepted_steps',
-                            'currentEnergy': 'pele_total_energy'}, inplace=True)
+    renaming_columns = {'numberOfAcceptedPeleSteps': 'accepted_steps', 'currentEnergy': 'pele_total_energy'}
+    for c in reports:
+        if 'DISTANCE TO ' in c:
+            if 'distance_center_mass' in renaming_columns.values():
+                raise IOError('Talk with the developer about error due to multiple distances in the report files')
+            else:
+                renaming_columns[c] = 'distance_center_mass'
+    # print renaming_columns
+    reports.rename(columns=renaming_columns, inplace=True)
     return reports
 
 
@@ -69,8 +77,15 @@ def parse_mpi_simulation_reports(directory):
             # raise_parsing_output_error(directory, 'mpi')
             return False
         reports = reports.append(next_report, ignore_index=True)
-    reports.rename(columns={'numberOfAcceptedPeleSteps': 'accepted_steps',
-                            'currentEnergy': 'pele_total_energy'}, inplace=True)
+    renaming_columns = {'numberOfAcceptedPeleSteps': 'accepted_steps', 'currentEnergy': 'pele_total_energy'}
+    for c in reports:
+        if 'DISTANCE TO ' in c:
+            if 'distance_center_mass' in renaming_columns.values():
+                raise IOError('Talk with the developer about error due to multiple distances in the report files')
+            else:
+                renaming_columns[c] = 'distance_center_mass'
+    # print renaming_columns
+    reports.rename(columns=renaming_columns, inplace=True)
     return reports
 
 
@@ -95,8 +110,15 @@ def parse_single_core_simulation_report(directory):
         reports['trajectory'] = glob.glob("{}*trajectory*.pdb".format(directory))[0]
     except IndexError:
         return False
-    reports.rename(columns={'AcceptedSteps': 'accepted_steps',
-                            'Energy': 'pele_total_energy'}, inplace=True)
+    renaming_columns = {'AcceptedSteps': 'accepted_steps', 'Energy': 'pele_total_energy'}
+    for c in reports:
+        if 'DISTANCE TO ' in c:
+            if 'distance_center_mass' in renaming_columns.values():
+                raise IOError('Talk with the developer about error due to multiple distances in the report files')
+            else:
+                renaming_columns[c] = 'distance_center_mass'
+    # print renaming_columns
+    reports.rename(columns=renaming_columns, inplace=True)
     return reports
 
 
@@ -130,7 +152,7 @@ def refine_data(raw_df, selection_window):
     """
     minimum_value = raw_df['pele_total_energy'].iloc[raw_df['pele_total_energy'].argmin()]
     maximum_value = minimum_value + selection_window
-    print minimum_value, maximum_value
+    # print minimum_value, maximum_value
     right_data = raw_df.loc[raw_df['pele_total_energy'].between(minimum_value, maximum_value)]
     right_data = right_data.reset_index()  # Maybe interesting to add the drop=True to avoid adding a
     # new column with the old indexes
@@ -238,7 +260,7 @@ def main(args):
                 system_general_name = folder.split('/')[-3]
         else:
             system_general_name = pattern.group(1)
-        print system_general_name
+        # print system_general_name
         # Set the outputs names
         current_output_folder = output_folder + system_general_name
 
@@ -246,9 +268,9 @@ def main(args):
         if args.simulation_type == "mpi":
             raw_reports_values = parse_mpi_simulation_reports(folder)
         elif args.simulation_type == "adaptive":
-            print 'h'
+            # print 'h'
             raw_reports_values = parse_adaptive_sampling_reports(folder)
-            print raw_reports_values
+            # print raw_reports_values
         else:
             raw_reports_values = parse_single_core_simulation_report(folder)
         if raw_reports_values is False:
