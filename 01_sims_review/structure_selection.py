@@ -7,6 +7,7 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import os
 import glob
 import pandas as pd
+import warnings
 import sys
 import numpy as np
 import re
@@ -18,7 +19,7 @@ import parameters_help
 # TODO: in case of more than one distance column in the report some system to identify them should be implemented.
 
 def raise_parsing_output_error(directory, type_of_simulation):
-    raise IOError("The directory {0} doesn't contain the right information"
+    warnings.warn("The directory {0} doesn't contain the right information"
                   "for a PELE simulation done with the protocol: {1}".format(directory,
                                                                              type_of_simulation))
 
