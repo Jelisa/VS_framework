@@ -148,7 +148,7 @@ def refine_data(raw_df, selection_window):
     A function to select the elements of the dataframe that are within the minimum value of a given column
     the 'pele_total_energy' in this case, and a value set by a given threshold
     :param raw_df: a pandas dataframe containing the data, it should have the 'pele_total_energy' column
-    :param selection_window: an integer containing the maximum variance to allow from the minimum.
+    :param selection_window: a float containing the maximum variance to allow from the minimum.
     :return: a pandas dataframe containing only the element within the range.
     """
     minimum_value = raw_df['pele_total_energy'].iloc[raw_df['pele_total_energy'].argmin()]
@@ -189,9 +189,10 @@ def select_and_write_structure(trajectory_filename, trajectory_model, current_ou
         return True
 
 
-def write_metrics_csv(initial_metrics, selected_metrics, output_path, prefix):
+def write_metrics_csv(initial_metrics, selected_metrics, output_path, prefix, columns2write):
     """
     This function generates two .csv files from the two dataframes it receives
+    :param columns2write:
     :param initial_metrics: a pandas dataframe containing the data for the initial model of the report
     :param selected_metrics: a pandas dataframe containing the data for the selected model of the report
     :param output_path: a string containing the path where the .csv files should be writen.
@@ -204,8 +205,8 @@ def write_metrics_csv(initial_metrics, selected_metrics, output_path, prefix):
     else:
         initial_metrics_output_filename = "{0}pele_initial_metrics.csv".format(output_path)
         selected_metrics_output_filename = "{0}pele_selected_models_metrics.csv".format(output_path)
-    initial_metrics.to_csv(initial_metrics_output_filename, index=False)
-    selected_metrics.to_csv(selected_metrics_output_filename, index=False)
+    initial_metrics.to_csv(initial_metrics_output_filename, columns=columns2write, index=False)
+    selected_metrics.to_csv(selected_metrics_output_filename, columns=columns2write, index=False)
 
 
 def main(args):
@@ -269,22 +270,22 @@ def main(args):
         if args.simulation_type == "mpi":
             raw_reports_values = parse_mpi_simulation_reports(folder)
         elif args.simulation_type == "adaptive":
-            # print 'h'
             raw_reports_values = parse_adaptive_sampling_reports(folder)
-            # print raw_reports_values
         else:
             raw_reports_values = parse_single_core_simulation_report(folder)
         if raw_reports_values is False:
             logging.error("WARNING: The report or trajectory file are missing, the system will be discontinued.")
             skipped_systems += 1
             continue
+        raw_reports_values['ID'] = system_general_name
 
-        # Set the columns to be extracted to the statistics
-        columns2use = [c for c in raw_reports_values.columns if c not in ['#Task', 'Step']]
         # Grab the initial metrics
-        initial_energies_values = initial_energies_values.append(raw_reports_values[columns2use].iloc[0])
-
-        refined_reports_values = refine_data(raw_reports_values, args.total_energy_deviation)
+        initial_energies_values = initial_energies_values.append(raw_reports_values.iloc[0])
+        if args.total_energy_deviation == "1std":
+            total_energy_margin = raw_reports_values['pele_total_energy'][1:].std(axis=0)
+        else:
+            total_energy_margin= args.total_energy_deviation
+        refined_reports_values = refine_data(raw_reports_values, total_energy_margin)
 
         if args.type_of_selection == "rmsd_clustering":
             raise LookupError("The selection using the rmsd clustering isn't implemented yet.")
@@ -303,9 +304,10 @@ def main(args):
                 if not correct_process:
                     skipped_systems += 1
                     continue
-            selected_models = selected_models.append(model_2_use[columns2use])
-
-    write_metrics_csv(initial_energies_values, selected_models, output_folder, args.output_prefix)
+            selected_models = selected_models.append(model_2_use)
+    # Set the columns to be extracted to the statistics
+    columns2use = ['ID'] + [c for c in initial_energies_values.columns if c not in ['#Task', 'Step', 'ID']]
+    write_metrics_csv(initial_energies_values, selected_models, output_folder, args.output_prefix, columns2use)
 
     logging.info("{} : Program finished correctly.\n"
                  "With {} warnings".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), skipped_systems))
@@ -325,7 +327,7 @@ if __name__ == '__main__':
                         help=parameters_help.structure_selection_ligand_chain_desc)
     parser.add_argument("-only_statistics", default=False, action="store_true",
                         help=parameters_help.structure_selection_only_statistics)
-    parser.add_argument("-total_energy_deviation", default=50, type=int,
+    parser.add_argument("-total_energy_deviation", default="1std",
                         help=parameters_help.ss_total_energy_deviation_desc)
     parser.add_argument("-initial_energies", action="store_true",
                         help=parameters_help.sims_review_initial_energies)
@@ -353,4 +355,9 @@ if __name__ == '__main__':
     #                     help=new_parameters_help.structure_selection_single_structure)
 
     arguments = parser.parse_args()
+    if arguments.total_energy_deviation != "1std":
+        try:
+            arguments.total_energy_deviation = float(arguments.total_energy_deviation)
+        except ValueError:
+            sys.exit("the argument total_energy_deviation has to be either '1std' or an number")
     main(arguments)
