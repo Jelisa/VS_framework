@@ -26,4 +26,5 @@ complexes_pre_created_name = "*_processed.pdb"
 
 datalocal_templates = "DataLocal/Templates/OPLS2005/HeteroAtoms/"
 datalocal_rotamerlib = "DataLocal/LigandRotamerLibs/"
+datalocal_obc_param = "DataLocal/OBC/"
 

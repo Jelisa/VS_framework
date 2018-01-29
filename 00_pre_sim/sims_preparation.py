@@ -49,9 +49,9 @@ def createsymboliclink(original, link):
         os.symlink(original, link)
     except OSError as e:
         if e[1] == "File exists":
-            logging.info(" - The link {} already exists. So it won't be created again.".format(link2data))
+            logging.info(" - The link {} already exists. So it won't be created again.".format(link))
         else:
-            logging.error(" - The link {} couldn't be created.".format(link2data))
+            logging.error(" - The link {} couldn't be created.".format(link))
     else:
         logging.info("   - Link created correctly")
 
@@ -864,6 +864,57 @@ def generate_adaptive_conf_values(template_keywords, complex_filename, lig_name,
     return adaptive_conf_key_val
 
 
+def generate_obc_parameters(lig_template, output_folder, terminate_if_fail):
+    logging.info(" - Checking for the existence of the OBC parameters.")
+    error = False
+    original_obc_param = enviroment_parameters.pele_folders + os.sep + "Data/OBC/solventParamsHCTOBC.txt"
+    copy_obc_folder = output_folder + const_values.datalocal_obc_param
+    copy_obc_param = copy_obc_folder + "solventParamsHCTOBC.txt"
+    if os.path.isdir(copy_obc_folder) and os.path.isfile(copy_obc_param):
+        # Checks if the folder and file already exist otherwise the program creates them.
+        logging.info(" - The parameters already exist.")
+    else:
+        logging.info(" - Generating the solvent parameters.")
+        command2call = esc.obc_param_command.format(lig_template)
+        # print command2call
+        try:
+            __ = check_output(command2call.split(), stderr=STDOUT)
+        except CalledProcessError as error_message:
+            if terminate_if_fail:
+                print "The program failed to execute the OBC script. The program will be terminated."
+                logging.critical("ERROR: The script to generate the OBC parameters couldn't be executed.")
+                logging.info("The error is in the command ' {} '".format(command2call))
+                logging.shutdown()
+                sys.exit("Program terminated due to the error:\n{}".format(error_message))
+            else:
+                error = True
+        else:
+            obc_command_output_file = lig_template + "_OBCParams.txt"
+            try:
+                os.mkdir(copy_obc_folder)
+            except OSError as e:
+                if search(r"exists", e[1]):
+                    pass
+                else:
+                    print "There's been a problem creating the OBC folder, review it.", e
+                    error = True
+            if not error:
+                shutil.copyfile(original_obc_param, copy_obc_param)
+                if os.path.isfile(obc_command_output_file):
+                    with open(obc_command_output_file, 'r') as obc_template_file:
+                        obc_text = "".join(obc_template_file.readlines()) + "\n"
+                    with open(copy_obc_param, 'a') as obc_param_file:
+                        obc_param_file.write(obc_text)
+                    os.remove(obc_command_output_file)
+    return error
+
+
+def update_counter(error_bool, counter):
+    if error_bool:
+        counter += 1
+    return error_bool, counter
+
+
 def main(args, log):
     command_first_execution = {"ploprottemp": True, 'mae2pdb_convert': True, 'pdb2mae_convert': True,
                                'mutations_program': True, 'obc_param_gen': True}
@@ -951,8 +1002,8 @@ def main(args, log):
                                                                           command_first_execution['mutations_program'])
                 if command_first_execution['mutations_program']:
                     command_first_execution['mutations_program'] = False
-                if s_error:
-                    total_errors_counter += 1
+                is_error, total_errors_counter = update_counter(s_error, total_errors_counter)
+                if is_error:
                     continue
                 complex_filename = create_complex_file(receptor_text, input_filename, current_output_path, input_id)
                 ligand_filename = input_filename
@@ -994,7 +1045,7 @@ def main(args, log):
                 continue
             if args.no_templates:
                 no_need_for_template = True
-        # Lets create the template and rotamer library if needed.
+        # Lets create the template, rotamer library and the obc parameters if needed.
         if not no_need_for_template:
             current_pele_template_folder = current_output_path + const_values.datalocal_templates
             s_error = createfolder(current_pele_template_folder)
@@ -1006,13 +1057,21 @@ def main(args, log):
             if s_error:
                 total_errors_counter += 1
                 continue
-            print command_first_execution
+            # print command_first_execution
             lig_template, s_error = create_template_and_rotamerlib(ligand_filename, current_pele_template_folder,
                                                                    current_rotamerlibs_folder,
                                                                    command_first_execution)
             if s_error:
                 total_errors_counter += 1
                 continue
+            if solvent_type == "obc":
+                s_error = generate_obc_parameters(lig_template, current_output_path,
+                                                  command_first_execution['obc_param_gen'])
+                if command_first_execution['obc_param_gen']:
+                    command_first_execution['obc_param_gen'] = False
+                if s_error:
+                    total_errors_counter +=1
+                    continue
         # This block creates the configuration file into the folder.
         if generate_configuration_file_template:
             if args.debug:
