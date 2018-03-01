@@ -11,9 +11,9 @@ ploprottemp = "{}/utilities/python {}".format(enviroment_parameters.schrodinger_
                                               enviroment_parameters.plop_path)
 ploprottemp_command = ploprottemp + " {} -mae_charges=no -mtor=5 -g=30 -clean=yes"
 mutations_program_command_lig_or_comp = "python " + enviroment_parameters.mutations_program_path + \
-                                        " -ipdb {} -make_unique {} -gaps_ter "
+                                        " -ipdb {} -make_unique {}"
 
 mutations_program_command_receptor = "python " + enviroment_parameters.mutations_program_path + \
-                                     " -ipdb {} -gaps_ter "
+                                     " -ipdb {} "
 obc_param_generator = "python {}".format(enviroment_parameters.obc_param_generator_path)
 obc_param_command = obc_param_generator + " {}"
