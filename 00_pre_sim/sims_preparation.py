@@ -1134,9 +1134,15 @@ def main(args, log):
                 print e
                 sys.exit("Error when creating the configuration file, missing keywords.")
             else:
-                new_adaptive_conf_file_filename = "{0}{1}{2}_adaptive_sampling.conf".format(current_output_path,
-                                                                                            args.cof_file_suffix,
-                                                                                            solvent_type)
+                if args.conf_file_suffix:
+                    new_adaptive_conf_file_filename = "{0}{1}{2}_{3}_adaptive_sampling.conf".format(current_output_path,
+                                                                                                input_id,
+                                                                                                args.conf_file_suffix,
+                                                                                                solvent_type)
+                else:
+                    new_adaptive_conf_file_filename = "{0}{1}_{2}_adaptive_sampling.conf".format(current_output_path,
+                                                                                                input_id,
+                                                                                                solvent_type)
                 with open(new_adaptive_conf_file_filename, 'w') as new_conf_file:
                     new_conf_file.write(adaptive_conf_file_text)
             adaptive_output = search(r'"outputPath" *: *"(.*)",', adaptive_conf_file_text)
