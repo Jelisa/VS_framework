@@ -1,4 +1,4 @@
-COMPLEX                 ../structures, 0
+COMPLEX                 ../structures_$glide_block, 0
 PPREP                   FALSE
 DOCK_PRECISION          $precision
 GRIDGEN_GRID_CENTER     SELF
