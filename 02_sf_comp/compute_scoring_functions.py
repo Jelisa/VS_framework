@@ -31,6 +31,8 @@ import logging
 import datetime
 
 import external_software_paths
+
+
 # import modules  # This is for AZ.
 
 
@@ -319,12 +321,11 @@ def xscore_execution(receptor_filename, ligand_filename, execution_folder):
         first_time_execution["xscore"] = False
 
 
-
 def binana_execution(receptor_filename, ligand_filename, execution_folder):
     if args.debug:
         print "Executing binana"
     binana_command = "python {0}binana_1_2_0.py -receptor {1} -ligand {2}".format(external_software_paths.binana_path,
-                                                                           receptor_filename, ligand_filename)
+                                                                                  receptor_filename, ligand_filename)
     if args.debug:
         print "comand:", binana_command
         print "wd:", execution_folder
@@ -343,7 +344,7 @@ def mmgbsa_execution(complex_filename, execution_folder, host, number_cpus, lig_
         print "Executing mmgbsa"
     mmgbsa_command = "{0}prime_mmgbsa;{1};-csv;yes;-ligand;'chain.name  {4} ';" \
                      "-HOST;{2}:{3};-WAIT".format(external_software_paths.schrodinger_path,
-                                                   complex_filename, host, number_cpus, lig_chain)
+                                                  complex_filename, host, number_cpus, lig_chain)
     if args.debug:
         print mmgbsa_command.split(';')
     try:
@@ -357,14 +358,16 @@ def mmgbsa_execution(complex_filename, execution_folder, host, number_cpus, lig_
         logging.info(" - mmgbsa execution takes more than 2 hours for this system, it won't be computed.")
 
 
+# Main program.
 parser = argparse.ArgumentParser()
 parser.add_argument("-input_files", nargs="+", required=True)
 parser.add_argument("-folders_path", default="./scoring_functions_values")
-#parser.add_argument("-output_general_name", default="all")
+# parser.add_argument("-output_general_name", default="all")
 parser.add_argument("-scoring_functions", nargs="+",
                     default=["glide", "vina", "xscore", "dsx", "mmgbsa", "binana", "rf_score"])
-parser.add_argument("-schrodinger_host", default="Calculon_slurm")
+parser.add_argument("-schrodinger_host", default="localhost")
 parser.add_argument("-schrodinger_cpus", default="1")
+parser.add_argument("-glide_max_structures_per_run", default=250, type=int)
 parser.add_argument("-vina_box_distance_to_ligand", default=20, type=int)
 parser.add_argument("-experimental_deltag", default="")
 parser.add_argument("-rf_score_output_file", default=-2)
@@ -397,9 +400,6 @@ rf_descriptors_extractor_path = "{0}RF-descriptors_extraction ".format(
     external_software_paths.rf_score_descriptors_extractor_path)
 rf_descriptors_commands = rf_descriptors_extractor_path + "--input_from_file {0} --output_file {1}"
 
-
-
-
 # Check for the folder separator in the new_folders path, add it at the end if it isn't.
 
 compute_autodock_vina = False
@@ -431,13 +431,14 @@ for sf in args.scoring_functions:
     elif re.search(r"binana", sf, re.IGNORECASE):
         compute_binana = True
     elif re.search(r"glide.*", sf, re.IGNORECASE):
+        # print sf
         a = re.search(r"glide-*_*(.P)*|glide-*_*(HTS)", sf, re.IGNORECASE)
         if a.group().lower() == "glide":
             glides2compute.append("glide_SP")
             first_time_execution['glide_SP'] = True
         else:
-            glides2compute.append("glide_"+a.group(1).upper())
-            first_time_execution["glide_"+a.group(1).upper()] = True
+            glides2compute.append("glide_" + a.group(1).upper())
+            first_time_execution["glide_" + a.group(1).upper()] = True
     elif re.search(r"obabel[_-]*desc(?:riptors)*", sf, re.IGNORECASE):
         compute_obabel_desc = True
 first_time_execution["obabel"] = True
@@ -446,6 +447,7 @@ first_time_execution["mae"] = True
 # If glide is one of the scoring functions to compute create the folders needed for glide computation
 # into the general subfolder, and write the input files for glide.
 if glides2compute:
+    # print 'here'
     if args.folders_path[-1] != os.sep:
         new_folders_path = args.folders_path + os.sep
     else:
@@ -462,34 +464,54 @@ if glides2compute:
             sys.exit(e)
     if args.debug:
         print 'bla'
-    glide_structures_subfolder = glide_subfolder + "structures" + os.sep
-    if args.debug:
-        print glide_structures_subfolder
-    try:
-        os.mkdir(glide_structures_subfolder)
-    except OSError as e:
-        if "File exists" not in e[1]:
-            sys.exit(e)
+    structures_folders = []
     glide_template_filename = external_software_paths.templates_directory + "glide_mininplace_template.in"
     with open(glide_template_filename, 'r') as infile:
         glide_template_text = infile.read()
     glides_template = Template(glide_template_text)
     glide_input_files = []
-    for glide_model in glides2compute:
-        glide_precision = glide_model.split('_')[-1]
-        glide_input_text = glides_template.substitute(precision=glide_precision)
-        glide_working_directory = glide_subfolder + "glide{}".format(glide_precision) + os.sep
+    n_glide_systems = 0
+    if len(args.input_files) > args.glide_max_structures_per_run:
+        divisions = len(args.input_files) / args.glide_max_structures_per_run
+        division_module = len(args.input_files) % args.glide_max_structures_per_run
+        if division_module == 0:
+            n_of_folders_to_create = divisions
+        else:
+            n_of_folders_to_create = divisions + 1
+    else:
+        n_of_folders_to_create = 1
+    for n in range(n_of_folders_to_create):
+        structure_folder = "{0}{1}".format(glide_subfolder, "structures_{0}{1}".format(n, os.sep))
+        structures_folders.append(structure_folder)
+        if args.debug:
+            print structure_folder
         try:
-            os.mkdir(glide_working_directory)
+            os.mkdir(structure_folder)
         except OSError as e:
             if "File exists" not in e[1]:
                 sys.exit(e)
-        glide_input_filename = glide_working_directory + "glide_{}_mininplace.in".format(glide_precision)
-        glide_input_files.append(glide_input_filename)
-        with open(glide_input_filename, 'w') as outfile:
-            outfile.write(glide_input_text)
+        for glide_model in glides2compute:
+            glide_precision = glide_model.split('_')[-1]
+            glide_input_text = glides_template.substitute(precision=glide_precision,
+                                                          glide_block=n)
+            glide_working_directory = "{0}{1}".format(glide_subfolder,
+                                                      "glide{0}_{1}{2}".format(glide_precision,
+                                                                               n, os.sep))
+            # print glide_working_directory
+            try:
+                os.mkdir(glide_working_directory)
+            except OSError as e:
+                if "File exists" not in e[1]:
+                    sys.exit(e)
+            glide_input_filename = glide_working_directory + "glide_{0}_{1}" \
+                                                             "_mininplace.in".format(glide_precision, n)
+            glide_input_files.append(glide_input_filename)
+            with open(glide_input_filename, 'w') as outfile:
+                outfile.write(glide_input_text)
+    glide_subfolder_to_use = 0
 else:
     glide_subfolder = ""
+    glide_subfolder_to_use = None
 keywords_in_the_vina_template = {}
 vina_template = ""
 if compute_autodock_vina:
@@ -532,7 +554,9 @@ if compute_rf_score:
                      "input the program will assign a dummy energy of 0 to all the systems")
 
 minimum_filename = ""
-for filename in args.input_files:
+args.input_files.sort()
+for counter, filename in enumerate(args.input_files):
+    # print filename
     logging.info("Working with the file: {0}".format(filename))
     if ".pdb" not in filename:
         logging.error(" - ERROR: This program expects to work with .pdb files since that is the output format of PELE.")
@@ -550,8 +574,10 @@ for filename in args.input_files:
     if working_folder == os.sep:
         working_folder = '.' + os.sep
     if glide_subfolder:
+        if counter >= args.glide_max_structures_per_run and counter % args.glide_max_structures_per_run == 0:
+            glide_subfolder_to_use += 1
         # noinspection PyUnboundLocalVariable
-        new_link = glide_structures_subfolder + basic_filename
+        new_link = structures_folders[glide_subfolder_to_use] + basic_filename
         try:
             os.symlink(os.path.abspath(filename), new_link)
         except OSError as e:
@@ -562,7 +588,8 @@ for filename in args.input_files:
     logging.info(" - Separating ligand and protein")
     try:
         protein_filename_pdb, protein_with_waters_pdb, \
-        waters_filename_pdb, ligand_filename_pdb = extract_ligand(filename, minimum_filename, args.ligand_chain, working_folder)
+        waters_filename_pdb, ligand_filename_pdb = extract_ligand(filename, minimum_filename,
+                                                                  args.ligand_chain, working_folder)
     except TypeError:
         logging.error(" - This system will be discontinued, due to a problem in the "
                       "separation of the ligand and protein.")
@@ -673,9 +700,9 @@ for filename in args.input_files:
                     try:
                         rf_score_name_deltag_dictio[minimum_filename] = deltag_values[pattern.group(1)]
                     except KeyError:
-                       logging.warning(" - WARNING: The name couldn't be found in the deltaG file, "
-                                    "a dummy deltaG of 0 will be used for the system.")
-                       rf_score_name_deltag_dictio[minimum_filename] = 0
+                        logging.warning(" - WARNING: The name couldn't be found in the deltaG file, "
+                                        "a dummy deltaG of 0 will be used for the system.")
+                        rf_score_name_deltag_dictio[minimum_filename] = 0
 
         else:
             if args.debug:
@@ -817,7 +844,7 @@ if compute_rf_score:
     rf_command = rf_descriptors_commands.format(rf_output_filename, rf_descriptors_output_filename)
     try:
         rf_output = check_output(rf_command.split())
-    except (CalledProcessError, OSError )as e:
+    except (CalledProcessError, OSError)as e:
         command_execution_failed(rf_command, e)
     else:
         if "Filename" not in rf_output:
