@@ -169,7 +169,7 @@ def obabel_converter(file_without_extension, input_extension, terminate_if_fail)
     return pdbfile, error
 
 
-def check_mutations_program_output(command_call, output_directory, terminate_if_fail):
+def check_mutations_program_output(command_call, output_directory, terminate_if_fail, verbose=True):
     """
     This function uses the subprocess module to call the external mutations program using the command
     provided and checks if it executes correctly, and returns the new file name. If the external
@@ -201,7 +201,8 @@ def check_mutations_program_output(command_call, output_directory, terminate_if_
             raise OSError("Program terminated due to an error executing the command: {}".format(command_call))
     else:
         generated_file = correct_output.group(1)
-        logging.info(" - The file ready for pele it's called: {0}".format(generated_file))
+        if verbose:
+            logging.info(" - The file ready for pele it's called: {0}".format(generated_file))
     return generated_file, errors
 
 
@@ -412,7 +413,8 @@ def check_ligand(lig_filename, ligand_chain, output_directory, terminate_if_fail
                 lig_file.write(new_lig)
         command_call = esc.mutations_program_command_lig_or_comp.format(lig_filename,
                                                                         ligand_chain) + " -opdb {}".format(lig_filename)
-        output_filename, errors = check_mutations_program_output(command_call, output_directory, terminate_if_fail)
+        output_filename, errors = check_mutations_program_output(command_call, output_directory,
+                                                                 terminate_if_fail, False)
         if output_filename != lig_filename:
             logging.error("The mutations_program.py isn't working correctly.")
             errors = True
@@ -820,9 +822,10 @@ def compute_center_of_mass(lig_filename):
 
 
 def generate_pele_conf_values(template_keywords, complex_filename, receptor_text, ligand_complete_path, gen_param,
-                              syst_id, adaptive_boolean=False):
+                              syst_id, hbonds_dictio=[], adaptive_boolean=False):
     """
     This function generates the values needed for each of the keywords in the PELE configuration template file.
+    :param hbonds_dictio: a list containing the atoms to use with the hbond keyword
     :param template_keywords: a list containing the keywords present in the PELE configuration template file.
     :param complex_filename: a string with the path to the complex file in PDB format to be used as
                             input for the simulation.
@@ -867,6 +870,12 @@ def generate_pele_conf_values(template_keywords, complex_filename, receptor_text
             keywords_values[keyword] = gen_param.pele_license
         elif search("system.*", keyword, IGNORECASE):
             keywords_values[keyword] = syst_id
+        elif search("hbond2", keyword, IGNORECASE):
+            keywords_values[keyword] = hbonds_dictio[1]
+        elif search("hbond1", keyword, IGNORECASE):
+            keywords_values[keyword] = hbonds_dictio[0]
+        elif search("COMPLEXES", keyword):
+            raise IOError("You're using a keyword from the adaptive simulations without using the adaptive parameters.")
         else:
             print "The keyword '{}' isn't a valid one".format(keyword)
             logging.warning("  WARNING: This system will be discontinued. The keyword {} isn't a valid one".format(
@@ -959,6 +968,15 @@ def update_counter(error_bool, counter):
     return error_bool, counter
 
 
+def parse_hbond_file (filename):
+    hbond_dictio = {}
+    with open(filename) as infile:
+        for line in infile.readlines():
+            line = line.strip().split()
+            hbond_dictio[line[0]] = line[1:]
+    return hbond_dictio
+
+
 def main(args, log):
     command_first_execution = {"ploprottemp": True, 'mae2pdb_convert': True, 'pdb2mae_convert': True,
                                'mutations_program': True, 'obc_param_gen': True}
@@ -997,6 +1015,12 @@ def main(args, log):
         generate_configuration_file_template = True
         pele_conf_template, keywords_in_the_pele_conf_template, \
         solvent_type, pele_sim_output_path = parse_template_file(args.conf_template, 'pele')
+        if args.hb_from_file and not ("hbond1" not in keywords_in_the_pele_conf_template or
+            "hbond2" not in keywords_in_the_pele_conf_template):
+            raise IOError("When the option hb_from_file is used the template should have either the"
+                          "keywork 'hbond1' or 'hbond2'.")
+        elif args.hb_from_file:
+            hbonds_dictionary = parse_hbond_file(args.hb_from_file)
     # Check the existence of configuration file template for the adaptive and generate a template and
     #  look for the parameters to generate.
     if args.adaptive_sampling:
@@ -1040,7 +1064,7 @@ def main(args, log):
             print '{}, {}, {}'.format(1, existing_complexes_files, args.rewrite)
         if not existing_complexes_files or args.rewrite:
             if args.debug:
-                print '{}, {}, {}'.format(2, create_complex)
+                print '{}, {}'.format(2, create_complex)
             if create_complex:
                 no_need_for_template, ligand_name, s_error = check_ligand(input_filename, args.ligand_chain,
                                                                           current_output_path,
@@ -1123,7 +1147,8 @@ def main(args, log):
                 print '{}: {}'.format(3, receptor_text)
             pele_conf_key_val, s_errors = generate_pele_conf_values(keywords_in_the_pele_conf_template,
                                                                     complex_filename, receptor_text, ligand_filename,
-                                                                    args, input_id, adaptive_simulation)
+                                                                    args, input_id, hbonds_dictionary[input_id],
+                                                                    adaptive_simulation)
             if s_error:
                 total_errors_counter += 1
                 continue
@@ -1137,7 +1162,7 @@ def main(args, log):
                 if args.debug:
                     print keywords_in_the_pele_conf_template
                     print pele_conf_key_val.keys()
-                print e
+                print 0, e
                 raise IOError("Error when creating the configuration file, missing keywords.")
             else:
                 if args.adaptive_sampling:
@@ -1252,6 +1277,8 @@ if __name__ == '__main__':
                             help=help_descriptions.constraint_desc)
     pele_group.add_argument("-atoms2constraint", default=enviroment_parameters.atoms2apply_constraints_default,
                             nargs='+', help=help_descriptions.atoms2constraint_desc)
+    pele_group.add_argument("-hb_from_file", default=enviroment_parameters.hb_from_file_def,
+                            help=help_descriptions.hb_from_file_desc)
     external_soft_group = parser.add_argument_group("External Software path", "The options to specify the path "
                                                                               "for the external software.")
     external_soft_group.add_argument("-schrodinger_path",
