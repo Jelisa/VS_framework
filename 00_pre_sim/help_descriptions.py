@@ -39,3 +39,5 @@ ligand_chain_desc = "The chain where the ligand is present. This chain should co
 mutations_program_path_desc = "The complete path to the mutations program script to prepare pdb files for PELE."
 obc_param_generator_desc = "The complete path to the solventOBCParamsGenerator script to generate the OBC parameters" \
                            "for the ligand for PELE."
+hb_from_file_desc = "The path to a file containing the atoms links for PELE to use for a distance metric. " \
+                    "In the followin format\nComplex linktoatom1 linktoatom2"
