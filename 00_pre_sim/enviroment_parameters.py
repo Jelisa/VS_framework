@@ -1,4 +1,4 @@
-pele_folders = "/home_old/jelisa"
+pele_folders = "/home/jelisa"
 schrodinger_path = '/home/jelisa/programs/Schrodinger_Suites_2017-1_Advanced_Linux-x86_64'
 plop_path = "/home_old/jelisa/PhD_work/plopRotTemp/ploProtTemp_repos/PlopRotTemp.py"
 conformational_template = "/home_old/kqtw353/stay/work/conformational_search_pele_template.conf"
@@ -11,7 +11,8 @@ subfolders_path_default = "./"
 adaptive_sampling_def = ""
 adaptive_sampling_keywords = ['COMPLEXES', 'SEED', 'OUTPUT_PATH', "PELE_STEPS"]
 atoms2apply_constraints_default = [" CA "]
-mutations_program_path = "/home_old/jelisa/PhD_work/vs_scripts/mutations_program/mutations_program.py"
+mutations_program_path = "/home_old/jelisa/PhD_work/vs_scripts/mut-prep4pele/mut_prep4pele.py"
 obc_param_generator_path = "/home_old/jelisa/PhD_work/binding_affinity/Scripts/solventOBCParamsGenerator.py"
 ligand_chain = "Z"
 conf_file_suffix = ""
+hb_from_file_def = ""
