@@ -839,7 +839,7 @@ def generate_pele_conf_values(template_keywords, complex_filename, receptor_text
 
 
 def generate_adaptive_conf_values(template_keywords, complex_filename, lig_name, new_pele_conf_file_filename,
-                                  pele_license_path):
+                                  pele_license_path, syst_id):
     """
     This function generates the values for each of the keywords in the adaptive configuration file template.
     :param template_keywords: a list containing the keywords in the adaptive configuration file template.
@@ -848,6 +848,7 @@ def generate_adaptive_conf_values(template_keywords, complex_filename, lig_name,
     :param lig_name: a string containing the name of the ligand.
     :param new_pele_conf_file_filename: a string containing the path to the PELE configuration file to use.
     :param pele_license_path: a string containing the path to the license file for PELE.
+    :param syst_id: a string containing the genral name from the system.
     :return: adaptive_conf_key_val; a dictionary containing the  values for each of the keys in the adaptive_sampling.py
                             configuration template file.
     """
@@ -861,6 +862,8 @@ def generate_adaptive_conf_values(template_keywords, complex_filename, lig_name,
             adaptive_conf_key_val[k] = new_pele_conf_file_filename.split(os.sep)[-1]
         elif search("license*", k, IGNORECASE):
             adaptive_conf_key_val[k] = pele_license_path
+        elif search("system.*", k, IGNORECASE):
+            adaptive_conf_key_val[k] = syst_id
     return adaptive_conf_key_val
 
 
@@ -1120,7 +1123,8 @@ def main(args, log):
         if args.adaptive_sampling:
             adaptive_conf_key_val = generate_adaptive_conf_values(keywords_in_the_adaptive_conf_template,
                                                                   complex_filename, ligand_name,
-                                                                  new_pele_conf_file_filename, args.pele_license)
+                                                                  new_pele_conf_file_filename,
+                                                                  args.pele_license, input_id)
             try:
                 adaptive_conf_file_text = adaptive_conf_template.substitute(adaptive_conf_key_val)
             except (KeyError, ValueError) as e:
