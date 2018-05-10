@@ -623,15 +623,15 @@ def create_template_and_rotamerlib(initial_pdb, template_folder, rotamer_library
             error = True
     else:
         terminate_if_errors_dict['ploprottemp'] = False
-        if "Removing Intermediate File:" not in ploprottemp_output:
+        if "rotamer library has been successfully created in" not in ploprottemp_output:
             error = True
             logging.error(" - The PlopRotTemp.py hasn't finished correctly, so the template and/or the rotamer "
                           "library may be missing.")
             logging.info(" - This system will be discontinued.")
     if not error:
         for name4file in os.listdir(ploprottemp_wd):
-            if fnmatch.fnmatch(name4file, "???"):
-                template_filename = template_folder + name4file.split(os.sep)[-1] + "z"
+            if fnmatch.fnmatch(name4file, "???z"):
+                template_filename = template_folder + name4file.split(os.sep)[-1]
                 initial_name_temp = ploprottemp_wd + name4file.split(os.sep)[-1]
                 shutil.move(initial_name_temp, template_filename)
             elif fnmatch.fnmatch(name4file, "*.rot.assign"):
