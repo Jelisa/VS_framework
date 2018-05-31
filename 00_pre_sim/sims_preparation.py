@@ -830,7 +830,6 @@ def generate_pele_conf_values(template_keywords, complex_filename, receptor_text
         elif search("system.*", keyword, IGNORECASE):
             keywords_values[keyword] = syst_id
         elif search("hbond2", keyword, IGNORECASE):
-            keywords_values[keyword] = hbonds_dictio[syst_id][1]
         elif search("hbond1", keyword, IGNORECASE):
             keywords_values[keyword] = hbonds_dictio[syst_id][0]
         elif search("COMPLEXES", keyword):
