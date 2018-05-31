@@ -822,10 +822,10 @@ def compute_center_of_mass(lig_filename):
 
 
 def generate_pele_conf_values(template_keywords, complex_filename, receptor_text, ligand_complete_path, gen_param,
-                              syst_id, hbonds_dictio=[], adaptive_boolean=False):
+                              syst_id, hbonds_dictio={}, adaptive_boolean=False):
     """
     This function generates the values needed for each of the keywords in the PELE configuration template file.
-    :param hbonds_dictio: a list containing the atoms to use with the hbond keyword
+    :param hbonds_dictio: a dictionary containing the atoms to use with the hbond keyword
     :param template_keywords: a list containing the keywords present in the PELE configuration template file.
     :param complex_filename: a string with the path to the complex file in PDB format to be used as
                             input for the simulation.
@@ -871,9 +871,9 @@ def generate_pele_conf_values(template_keywords, complex_filename, receptor_text
         elif search("system.*", keyword, IGNORECASE):
             keywords_values[keyword] = syst_id
         elif search("hbond2", keyword, IGNORECASE):
-            keywords_values[keyword] = hbonds_dictio[1]
+            keywords_values[keyword] = hbonds_dictio[syst_id][1]
         elif search("hbond1", keyword, IGNORECASE):
-            keywords_values[keyword] = hbonds_dictio[0]
+            keywords_values[keyword] = hbonds_dictio[syst_id][0]
         elif search("COMPLEXES", keyword):
             raise IOError("You're using a keyword from the adaptive simulations without using the adaptive parameters.")
         else:
@@ -973,6 +973,10 @@ def parse_hbond_file (filename):
     with open(filename) as infile:
         for line in infile.readlines():
             line = line.strip().split()
+            if not line:
+                continue
+            if len(line) == 1:
+                raise IndexError("Each line in the hbonds file should have at least two elements.")
             hbond_dictio[line[0]] = line[1:]
     return hbond_dictio
 
@@ -1021,6 +1025,11 @@ def main(args, log):
                           "keywork 'hbond1' or 'hbond2'.")
         elif args.hb_from_file:
             hbonds_dictionary = parse_hbond_file(args.hb_from_file)
+        elif ("hbond1" not in keywords_in_the_pele_conf_template or
+              "hbond2" not in keywords_in_the_pele_conf_template) and not args.hb_from_file:
+            raise IOError("The pele template has the hbond keywords but none has been provided.")
+        else:
+            hbonds_dictionary = {}
     # Check the existence of configuration file template for the adaptive and generate a template and
     #  look for the parameters to generate.
     if args.adaptive_sampling:
@@ -1147,7 +1156,7 @@ def main(args, log):
                 print '{}: {}'.format(3, receptor_text)
             pele_conf_key_val, s_errors = generate_pele_conf_values(keywords_in_the_pele_conf_template,
                                                                     complex_filename, receptor_text, ligand_filename,
-                                                                    args, input_id, hbonds_dictionary[input_id],
+                                                                    args, input_id, hbonds_dictionary,
                                                                     adaptive_simulation)
             if s_error:
                 total_errors_counter += 1
