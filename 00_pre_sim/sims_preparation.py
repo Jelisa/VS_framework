@@ -136,6 +136,39 @@ def schrodinger_mae2pdb_converter(file_without_extension, terminate_if_fail):
     return pdbfile, error
 
 
+def obabel_converter(file_without_extension, input_extension, terminate_if_fail):
+    """
+    A function to use obabel to convert the file to .pdb format
+    :param file_without_extension: a string containing the name of the file to read and generate
+    :param terminate_if_fail: a boolean indicating whther the program should raise an exception if
+    the conversion fails or not
+    :return: the pdb file name and a boolear indicating if there's been an error or not.
+    """
+    initial_file = "{0}.{1}".format(file_without_extension, input_extension)
+    pdbfile = "{0}.pdb".format(file_without_extension)
+    print file_without_extension, input_extension, terminate_if_fail
+    if input_extension in ['smi', 'smile']:
+        command2call = esc.obabel_convert_to_pdb_and_gen_3d.format(input_extension, initial_file, pdbfile)
+    else:
+        command2call = esc.obabel_convert_to_pdb.format(input_extension, initial_file, pdbfile)
+    print command2call
+    try:
+        check_call(command2call.split())
+    except CalledProcessError as error_message:
+        print "here??"
+        if terminate_if_fail:
+            logging.critical("ERROR: Obabel has been unable to perform the conversion.")
+            logging.info("The error is in the command ' {} '".format(command2call))
+            logging.shutdown()
+            raise OSError("Program terminated due to the error:\n{}".format(error_message))
+        else:
+            logging.error(" - ERROR: The Obabel has been unable to perform the conversion.")
+            error = True
+    else:
+        error = False
+    return pdbfile, error
+
+
 def check_mutations_program_output(command_call, output_directory, terminate_if_fail):
     """
     This function uses the subprocess module to call the external mutations program using the command
@@ -439,17 +472,25 @@ def input_preprocess(original_file, original_output_directory, rewrite, terminat
         new_copy = new_output + filename
         if rewrite or not os.path.isfile(new_copy):
             shutil.copyfile(original_file, new_copy)
-        # If the file is in .mae format it'll be converted to .pdb format to be able to do the checks
-        # and modifications needed in a simpler way.
-        is_mae_file = search("(.*)\.mae", new_copy)
-        if is_mae_file:
+        # If the file is in another format other than .pdb format it'll be converted to .pdb format
+        # in order to do the checks and modifications needed in a simpler way.
+        file_pattern = search(r"(.*)\.([a-z0-9]*)", new_copy)
+        if file_pattern is None:
+            raise AttributeError("The file name doesn't have an extension.")
+        else:
+            filename, file_extension = file_pattern.groups()
+        # is_mae_file = search("(.*)\.mae", new_copy)
+        if file_extension == 'mae':
             #  The input file has .mae format so it should be transformed to .pdb format
-            new_copy, s_error = schrodinger_mae2pdb_converter(is_mae_file.group(1),
+            new_copy, s_error = schrodinger_mae2pdb_converter(filename,
                                                               terminate_if_errors_dict['mae2pdb_convert'])
             if s_error:
                 error = True
             else:
                 terminate_if_errors_dict['mae2pdb_convert'] = False
+        else:
+            new_copy, s_error = obabel_converter(filename, file_extension, terminate_if_errors_dict['mae2pdb_convert'])
+
     return system_id, new_copy, new_output, error
 
 
@@ -935,13 +976,14 @@ def main(args, log):
     else:
         create_complex = False
     # check if the input files are in the right format, if any of them isn't it will be skipped
-    input_files = input_format_check(args.input_files, log)
-    if not input_files:
-        log.critical("\nERROR: None of the files specified in the input has the right format."
-                     "\nTerminating the program.")
-        log.info("The input files are {}".format("\n".join([filename for filename in args.input_files])))
-        log.shutdown()
-        raise IOError("ERROR: No valid input file.\nTerminating the program.")
+    input_files = args.input_files
+    # input_files = input_format_check(args.input_files, log)
+    # if not input_files:
+    #     log.critical("\nERROR: None of the files specified in the input has the right format."
+    #                  "\nTerminating the program.")
+    #     log.info("The input files are {}".format("\n".join([filename for filename in args.input_files])))
+    #     log.shutdown()
+    #     raise IOError("No valid input file.\nTerminating the program.")
 
     # Check the PELE configuration file template to look for the parameters to generate.
     if match("none", args.conf_template, IGNORECASE):
