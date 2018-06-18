@@ -146,13 +146,16 @@ def obabel_converter(file_without_extension, input_extension, terminate_if_fail)
     """
     initial_file = "{0}.{1}".format(file_without_extension, input_extension)
     pdbfile = "{0}.pdb".format(file_without_extension)
+    print file_without_extension, input_extension, terminate_if_fail
     if input_extension in ['smi', 'smile']:
         command2call = esc.obabel_convert_to_pdb_and_gen_3d.format(input_extension, initial_file, pdbfile)
     else:
         command2call = esc.obabel_convert_to_pdb.format(input_extension, initial_file, pdbfile)
+    print command2call
     try:
         check_call(command2call.split())
     except CalledProcessError as error_message:
+        print "here??"
         if terminate_if_fail:
             logging.critical("ERROR: Obabel has been unable to perform the conversion.")
             logging.info("The error is in the command ' {} '".format(command2call))
@@ -471,11 +474,11 @@ def input_preprocess(original_file, original_output_directory, rewrite, terminat
             shutil.copyfile(original_file, new_copy)
         # If the file is in another format other than .pdb format it'll be converted to .pdb format
         # in order to do the checks and modifications needed in a simpler way.
-        file_pattern = search(r"(.*)\.([a-z0-9])", new_copy)
+        file_pattern = search(r"(.*)\.([a-z0-9]*)", new_copy)
         if file_pattern is None:
             raise AttributeError("The file name doesn't have an extension.")
         else:
-            filename, file_extension = file_pattern.groups
+            filename, file_extension = file_pattern.groups()
         # is_mae_file = search("(.*)\.mae", new_copy)
         if file_extension == 'mae':
             #  The input file has .mae format so it should be transformed to .pdb format
@@ -486,7 +489,7 @@ def input_preprocess(original_file, original_output_directory, rewrite, terminat
             else:
                 terminate_if_errors_dict['mae2pdb_convert'] = False
         else:
-            obabel_converter(filename, file_extension, terminate_if_errors_dict['mae2pdb_convert'])
+            new_copy, s_error = obabel_converter(filename, file_extension, terminate_if_errors_dict['mae2pdb_convert'])
 
     return system_id, new_copy, new_output, error
 
@@ -973,13 +976,14 @@ def main(args, log):
     else:
         create_complex = False
     # check if the input files are in the right format, if any of them isn't it will be skipped
-    input_files = input_format_check(args.input_files, log)
-    if not input_files:
-        log.critical("\nERROR: None of the files specified in the input has the right format."
-                     "\nTerminating the program.")
-        log.info("The input files are {}".format("\n".join([filename for filename in args.input_files])))
-        log.shutdown()
-        raise IOError("ERROR: No valid input file.\nTerminating the program.")
+    input_files = args.input_files
+    # input_files = input_format_check(args.input_files, log)
+    # if not input_files:
+    #     log.critical("\nERROR: None of the files specified in the input has the right format."
+    #                  "\nTerminating the program.")
+    #     log.info("The input files are {}".format("\n".join([filename for filename in args.input_files])))
+    #     log.shutdown()
+    #     raise IOError("No valid input file.\nTerminating the program.")
 
     # Check the PELE configuration file template to look for the parameters to generate.
     if match("none", args.conf_template, IGNORECASE):
