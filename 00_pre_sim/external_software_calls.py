@@ -17,3 +17,6 @@ mutations_program_command_receptor = "python " + enviroment_parameters.mutations
                                      " -ipdb {} "
 obc_param_generator = "python {}".format(enviroment_parameters.obc_param_generator_path)
 obc_param_command = obc_param_generator + " {}"
+
+obabel_convert_to_pdb = "obabel -i{} {} -O {}"
+obabel_convert_to_pdb_and_gen_3d = "obabel -i{} {} -O {} -h --gen3D"
