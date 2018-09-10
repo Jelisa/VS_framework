@@ -682,12 +682,13 @@ for counter, filename in enumerate(args.input_files):
             print 9
         # The real computation of RF-score is done manually.
         logging.info(" - Preparing RF deltaG")
+        path_to_structure = os.sep.join(filename.split(os.sep)[:-1])
         if deltag_values:
             # noinspection PyUnboundLocalVariable
             if minimum_filename in deltag_values.keys():
                 if args.debug:
                     print 10
-                rf_score_name_deltag_dictio[minimum_filename] = deltag_values[minimum_filename]
+                rf_score_name_deltag_dictio[path_to_structure] = deltag_values[minimum_filename]
             else:
                 if args.debug:
                     print 11
@@ -695,19 +696,18 @@ for counter, filename in enumerate(args.input_files):
                 if pattern is None:
                     logging.warning(" - WARNING: The name couldn't be found in the deltaG file, "
                                     "a dummy deltaG of 0 will be used for the system.")
-                    rf_score_name_deltag_dictio[minimum_filename] = 0
+                    rf_score_name_deltag_dictio[path_to_structure] = 0
                 else:
                     try:
-                        rf_score_name_deltag_dictio[minimum_filename] = deltag_values[pattern.group(1)]
+                        rf_score_name_deltag_dictio[path_to_structure] = deltag_values[pattern.group(1)]
                     except KeyError:
                         logging.warning(" - WARNING: The name couldn't be found in the deltaG file, "
                                         "a dummy deltaG of 0 will be used for the system.")
-                        rf_score_name_deltag_dictio[minimum_filename] = 0
-
+                        rf_score_name_deltag_dictio[path_to_structure] = 0
         else:
             if args.debug:
                 print 12
-            rf_score_name_deltag_dictio[minimum_filename] = 0
+            rf_score_name_deltag_dictio[path_to_structure] = 0
     if compute_autodock_vina and compute_binana:
         if args.debug:
             print 5
